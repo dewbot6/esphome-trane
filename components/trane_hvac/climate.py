@@ -15,6 +15,7 @@ CONF_HEAT_SETPOINT_SENSOR = "heat_setpoint_sensor"
 CONF_COOL_SETPOINT_SENSOR = "cool_setpoint_sensor"
 CONF_MODE_TEXT_SENSOR = "mode_text_sensor"
 CONF_DEMAND_STAGE_SENSOR = "demand_stage_sensor"
+CONF_INDOOR_UNIT_STATE_SENSOR = "indoor_unit_state_sensor"
 CONF_SET_MODE_ACTION = "set_mode_action"
 CONF_SET_TEMPERATURE_ACTION = "set_temperature_action"
 CONF_SET_PRESET_ACTION = "set_preset_action"
@@ -25,6 +26,7 @@ CONFIG_SCHEMA = climate.climate_schema(TraneClimate).extend({
     cv.Required(CONF_COOL_SETPOINT_SENSOR): cv.use_id(sensor.Sensor),
     cv.Required(CONF_MODE_TEXT_SENSOR): cv.use_id(text_sensor.TextSensor),
     cv.Optional(CONF_DEMAND_STAGE_SENSOR): cv.use_id(text_sensor.TextSensor),
+    cv.Optional(CONF_INDOOR_UNIT_STATE_SENSOR): cv.use_id(text_sensor.TextSensor),
     cv.Optional(CONF_SET_MODE_ACTION): automation.validate_automation(single=True),
     cv.Optional(CONF_SET_TEMPERATURE_ACTION): automation.validate_automation(single=True),
     cv.Optional(CONF_SET_PRESET_ACTION): automation.validate_automation(single=True),
@@ -52,6 +54,10 @@ async def to_code(config):
     if CONF_DEMAND_STAGE_SENSOR in config:
         demand = await cg.get_variable(config[CONF_DEMAND_STAGE_SENSOR])
         cg.add(var.set_demand_stage_sensor(demand))
+
+    if CONF_INDOOR_UNIT_STATE_SENSOR in config:
+        ius = await cg.get_variable(config[CONF_INDOOR_UNIT_STATE_SENSOR])
+        cg.add(var.set_indoor_unit_state_sensor(ius))
 
     if CONF_SET_MODE_ACTION in config:
         await automation.build_automation(

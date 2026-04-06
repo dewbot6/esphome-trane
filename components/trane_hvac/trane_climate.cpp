@@ -77,8 +77,10 @@ void TraneClimate::setup() {
   //   "--"          = idle between cycles
   //   "HP Stage 1"  = heat pump low stage
   //   "HP Stage 2"  = heat pump high stage
-  //   "HP2+ID1"     = heat pump + induced draft stage 1 (defrost/aux)
-  //   "HP2+ID2"     = heat pump + induced draft stage 2 (defrost/aux)
+  //   "HP1+ID1"     = heat pump stage 1 + induced draft stage 1
+  //   "HP1+ID2"     = heat pump stage 1 + induced draft stage 2
+  //   "HP2+ID1"     = heat pump stage 2 + induced draft stage 1 (defrost/aux)
+  //   "HP2+ID2"     = heat pump stage 2 + induced draft stage 2 (defrost/aux)
   //   "ID Stage 1"  = induced draft / gas stage 1 (furnace only)
   //   "ID Stage 2"  = induced draft / gas stage 2 (furnace only)
   if (demand_sensor_ != nullptr) {
@@ -86,12 +88,14 @@ void TraneClimate::setup() {
       if (this->mode == climate::CLIMATE_MODE_OFF) {
         this->action = climate::CLIMATE_ACTION_OFF;
       } else if (state == "--" || state.empty()) {
+        // "--" means compressor idle — could still be fan running
+        // action will be updated by indoor_unit_state if blower is active
         this->action = climate::CLIMATE_ACTION_IDLE;
       } else if (state.find("Cool") != std::string::npos) {
         this->action = climate::CLIMATE_ACTION_COOLING;
       } else if (state.find("HP") != std::string::npos ||
                  state.find("ID") != std::string::npos) {
-        // HP Stage x, HP2+IDx, ID Stage x — all heating
+        // HP Stage 1, HP Stage 2, HP1+ID1, HP1+ID2, HP2+ID1, HP2+ID2, ID Stage 1, ID Stage 2
         this->action = (this->mode == climate::CLIMATE_MODE_COOL)
                          ? climate::CLIMATE_ACTION_COOLING
                          : climate::CLIMATE_ACTION_HEATING;
@@ -99,6 +103,21 @@ void TraneClimate::setup() {
         this->action = climate::CLIMATE_ACTION_IDLE;
       }
       this->publish_state();
+    });
+  }
+
+  // Subscribe to indoor unit state for fan action detection
+  // IndoorStatus.D = "B" means blower running, "A" means transition/off
+  // When demand stage is "--" but blower is running = fan post-cycle state
+  if (indoor_unit_state_sensor_ != nullptr) {
+    indoor_unit_state_sensor_->add_on_state_callback([this](const std::string &state) {
+      if (state == "B" && this->action == climate::CLIMATE_ACTION_IDLE) {
+        this->action = climate::CLIMATE_ACTION_FAN;
+        this->publish_state();
+      } else if (state == "A" && this->action == climate::CLIMATE_ACTION_FAN) {
+        this->action = climate::CLIMATE_ACTION_IDLE;
+        this->publish_state();
+      }
     });
   }
 

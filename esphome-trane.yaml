@@ -182,6 +182,17 @@ sensor:
     update_interval: 5s
     device_id: dev_thermostat
 
+  - platform: template
+    name: "Weather Humidity"
+    id: weather_humidity
+    unit_of_measurement: "%"
+    device_class: humidity
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: "return NAN;"
+    update_interval: 60s
+    device_id: dev_thermostat
+
   # --- SC360 Controller -----------------------------------------------------
   - platform: template
     name: "System Demand Percent"
@@ -218,6 +229,17 @@ sensor:
   - platform: template
     name: "Temp Sensor 3"
     id: temp_sensor_3
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    lambda: "return NAN;"
+    update_interval: 60s
+    device_id: dev_sc360
+
+  - platform: template
+    name: "SC360 Outdoor Temp"
+    id: sc360_outdoor_temp
     unit_of_measurement: "°F"
     device_class: temperature
     state_class: measurement
@@ -404,18 +426,18 @@ text_sensor:
     device_id: dev_thermostat
 
   - platform: template
-    name: "Weather Location"
-    id: weather_location
+    name: "Weather Condition Code"
+    id: weather_condition_code
     device_id: dev_thermostat
 
   - platform: template
-    name: "Weather Humidity"
-    id: weather_humidity
+    name: "Weather Current Temp"
+    id: weather_current_temp
     device_id: dev_thermostat
 
   - platform: template
-    name: "Weather Forecast Temp"
-    id: weather_forecast_temp
+    name: "Weather Feels Like"
+    id: weather_feels_like
     device_id: dev_thermostat
 
   # --- Air Handler ----------------------------------------------------------
@@ -435,6 +457,7 @@ text_sensor:
 # ---------------------------------------------------------------------------
 climate:
   - platform: trane_hvac
+    id: trane_climate
     name: "Trane Climate"
     device_id: dev_thermostat
     current_temperature_sensor: room_temp
@@ -442,6 +465,7 @@ climate:
     cool_setpoint_sensor: cool_setpoint
     mode_text_sensor: system_mode
     demand_stage_sensor: system_demand
+    indoor_unit_state_sensor: indoor_unit_state
 
     set_mode_action:
       - script.execute:
@@ -586,8 +610,16 @@ canbus:
                     e_pos += 5;
                     auto e = j.find("\"", e_pos);
                     if (e != std::string::npos) {
-                      float h = atof(j.substr(e_pos, e-e_pos).c_str());
-                      if (h > 0 && h <= 100) id(indoor_humidity).publish_state(h);
+                      std::string estr = j.substr(e_pos, e-e_pos);
+                      // Values with decimal point (e.g. "28.00") are SC360 outdoor temp
+                      // Integer values (e.g. "42") are indoor humidity %
+                      if (estr.find('.') != std::string::npos) {
+                        float t = atof(estr.c_str());
+                        if (t > 0 && t < 130) id(sc360_outdoor_temp).publish_state(t);
+                      } else {
+                        float h = atof(estr.c_str());
+                        if (h > 0 && h <= 100) id(indoor_humidity).publish_state(h);
+                      }
                     }
                   }
                 }
@@ -638,27 +670,42 @@ canbus:
                 // WeatherToday
                 auto wt = j.find("\"WeatherToday\"");
                 if (wt != std::string::npos) {
-                  auto f_pos = j.find("\"F\":\"", wt);
-                  if (f_pos != std::string::npos) {
-                    f_pos += 5;
-                    auto e = j.find("\"", f_pos);
-                    if (e != std::string::npos)
-                      id(weather_forecast_temp).publish_state(j.substr(f_pos, e-f_pos));
-                  }
+                  // D = current outdoor temp (°F)
                   auto wd = j.find("\"D\":\"", wt);
                   if (wd != std::string::npos) {
                     wd += 5;
                     auto e = j.find("\"", wd);
                     if (e != std::string::npos)
-                      id(weather_humidity).publish_state(j.substr(wd, e-wd));
+                      id(weather_current_temp).publish_state(j.substr(wd, e-wd));
                   }
+                  // E = outdoor humidity (%)
+                  auto we = j.find("\"E\":\"", wt);
+                  if (we != std::string::npos) {
+                    we += 5;
+                    auto e = j.find("\"", we);
+                    if (e != std::string::npos) {
+                      float h = atof(j.substr(we, e-we).c_str());
+                      if (h > 0 && h <= 100) id(weather_humidity).publish_state(h);
+                    }
+                  }
+                  // F = feels-like temp (°F)
+                  auto wf = j.find("\"F\":\"", wt);
+                  if (wf != std::string::npos) {
+                    wf += 5;
+                    auto e = j.find("\"", wf);
+                    if (e != std::string::npos)
+                      id(weather_feels_like).publish_state(j.substr(wf, e-wf));
+                  }
+                  // G = forecast high (°F) - already in README, no sensor needed yet
+                  // H = condition code
                   auto wh = j.find("\"H\":\"", wt);
                   if (wh != std::string::npos) {
                     wh += 5;
                     auto e = j.find("\"", wh);
                     if (e != std::string::npos)
-                      id(weather_location).publish_state(j.substr(wh, e-wh));
+                      id(weather_condition_code).publish_state(j.substr(wh, e-wh));
                   }
+                  // I = forecast low (°F) - already in README, no sensor needed yet
                 }
                 // IndoorStatus
                 auto ind = j.find("\"IndoorStatus\"");

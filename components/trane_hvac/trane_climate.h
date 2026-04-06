@@ -24,6 +24,7 @@ class TraneClimate : public climate::Climate, public Component {
   void set_cool_setpoint_sensor(sensor::Sensor *s) { cool_setpoint_sensor_ = s; }
   void set_mode_sensor(text_sensor::TextSensor *s) { mode_sensor_ = s; }
   void set_demand_stage_sensor(text_sensor::TextSensor *s) { demand_sensor_ = s; }
+  void set_indoor_unit_state_sensor(text_sensor::TextSensor *s) { indoor_unit_state_sensor_ = s; }
 
   // Trigger accessors for climate.py automation binding
   Trigger<climate::ClimateMode> *get_mode_trigger() { return &mode_trigger_; }
@@ -39,6 +40,7 @@ class TraneClimate : public climate::Climate, public Component {
   sensor::Sensor *cool_setpoint_sensor_{nullptr};
   text_sensor::TextSensor *mode_sensor_{nullptr};
   text_sensor::TextSensor *demand_sensor_{nullptr};
+  text_sensor::TextSensor *indoor_unit_state_sensor_{nullptr};
 
   Trigger<climate::ClimateMode> mode_trigger_;
   Trigger<float, float> temperature_trigger_;   // args: hsp_f, csp_f (°F)

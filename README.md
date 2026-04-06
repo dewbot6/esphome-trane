@@ -123,21 +123,33 @@ esphome-trane/
 |---|---|---|
 | `SystemOpStatus` | `A` | System state: `A`=active, `E`=error/standby, `G`=coast-down |
 | `SystemOpStatus` | `B` | System mode: `A`=heat, `B`=cool, `C`=off |
-| `SystemOpStatus` | `C` | Demand stage: `--`, `HP Stage 1`, `HP Stage 2`, `HP2+ID1`, `HP2+ID2`, `ID Stage 1`, `ID Stage 2` |
+| `SystemOpStatus` | `C` | Demand stage: `--`, `HP Stage 1`, `HP Stage 2`, `HP1+ID1`, `HP1+ID2`, `HP2+ID1`, `HP2+ID2`, `ID Stage 1`, `ID Stage 2` |
 | `SystemOpStatus` | `D` | Elapsed run time (minutes, resets each cycle) |
-| `SystemOpStatus` | `E` | Indoor humidity (%) |
-| `OdStatus` | `B` | Outdoor coil/liquid-line temperature (°F) |
+| `SystemOpStatus` | `E` (integer) | Indoor humidity (%) |
+| `SystemOpStatus` | `E` (float, e.g. `28.00`) | SC360 outdoor ambient temp (°F) |
+| `OdStatus` | `A` | Outdoor unit active flag (always `"A"` when running) |
+| `OdStatus` | `B` | Compressor speed % (0–100, tracks CompDemandPercent at high load) |
 | `OdStatus` | `C` | Outdoor unit state: `B`=running, `D`=off |
+| `OdStatus` | `D` | Outdoor unit fault code (`"0"` = no fault) |
 | `OdStatus` | `CompDemandPercent` | Compressor demand (%) |
+| `OutdoorSettings` | `OdTempUserOffset` | Outdoor temp user calibration offset |
+| `OutdoorSettings` | `A` | Outdoor settings flag |
 | `IndoorStatus` | `D` | Blower state: `A`=transition, `B`=running |
 | `IndoorStatus` | `E` | Supply air temp (°F) or fault string (e.g. `TA_INV_HI`) |
 | `ZoneStatus` | `H` | Room temperature (°F) |
 | `ZoneStatus` | `HcStatus` | Heat/cool call: `3`=call active, `4`=satisfied, `5`=elevated call, `7`=aux/emergency |
-| `ZoneStatus` | `HoldText` | Schedule text (e.g. `Following Schedule: SLEEP`) |
+| `ZoneStatus` | `HoldText` | Schedule/hold text. Schedule names: `WAKE`, `DAY`, `EVENING`, `SLEEP`. Timed hold format: `"Holding Until Today HH:MM"` |
 | `SpOverride` | `Hsp` / `Csp` | Heat / cool setpoints (°F) |
 | `SpOverride` | `HoldType` | `0`=schedule, `2`=manual hold |
-| `WeatherToday` | `D` / `F` | Current outdoor temp readings (°F) |
+| `WeatherToday` | `D` | Current outdoor temp (°F) |
+| `WeatherToday` | `E` | Current outdoor humidity (%) |
+| `WeatherToday` | `F` | Feels-like temp (°F) |
+| `WeatherToday` | `G` | Forecast high temp (°F) |
+| `WeatherToday` | `H` | Weather condition code (observed values: `P`, `Q`, `AL`, `AX`, `AZ`, `BB`) |
+| `WeatherToday` | `I` | Forecast low temp (°F) |
 | `ActiveAlarms` | `AlarmId` | Fault code (e.g. `Err 185.09`) |
+| `TechAppAccess` | `A` | Technician/app access flag (observed only) |
+| `ScheduleCopy` | — | Schedule sync notification (observed only, payload empty) |
 
 ### `0x641` — Command/Response
 
@@ -160,6 +172,28 @@ esphome-trane/
 | `0x387` | Outdoor coil temp (°F) |
 | `0x38F` | Refrigerant pressure (PSI) |
 | `0x410` / `0x430` / `0x450` | SC360 temp sensors 1–3 (°F) |
+
+---
+
+## Operating State Mapping
+
+Cross-referenced against the Trane Home app activity log:
+
+| App state | CAN bus equivalent |
+|---|---|
+| heat | `HcStatus=3`, `SystemOpStatus.C` = `HP Stage 1/2` or `ID Stage 1/2` |
+| cool | `HcStatus=3`, `SystemOpStatus.C` = `Cool Stage` (not yet observed) |
+| defrost | `SystemOpStatus.C` = `HP2+ID1` or `HP2+ID2` |
+| emergency heating | `HcStatus=7`, `SystemOpStatus.C` = `ID Stage 1/2` |
+| fan | `SystemOpStatus.C` = `--`, `IndoorStatus.D` = `B` (blower running post-cycle) |
+| idle | `HcStatus=4`, `SystemOpStatus.C` = `--` |
+| waiting | `SystemOpStatus.A` = `E` (post-alarm standby/lockout) |
+
+App "Run mode" maps to `SpOverride.HoldType`: hold temp = `2`, run schedule = `0`.
+
+App "Compressor speed" maps directly to `OdStatus.B` (0–100%).
+
+App "Outdoor temperature" maps to `SystemOpStatus.E` (SC360 ambient sensor, float).
 
 ---
 
