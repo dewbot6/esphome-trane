@@ -89,6 +89,46 @@ globals:
     type: float
     restore_value: yes
     initial_value: "75.0"
+  - id: hsp_zone2
+    type: float
+    restore_value: yes
+    initial_value: "70.0"
+  - id: csp_zone2
+    type: float
+    restore_value: yes
+    initial_value: "75.0"
+  - id: hsp_zone3
+    type: float
+    restore_value: yes
+    initial_value: "70.0"
+  - id: csp_zone3
+    type: float
+    restore_value: yes
+    initial_value: "75.0"
+  - id: hsp_zone4
+    type: float
+    restore_value: yes
+    initial_value: "70.0"
+  - id: csp_zone4
+    type: float
+    restore_value: yes
+    initial_value: "75.0"
+  - id: hsp_zone5
+    type: float
+    restore_value: yes
+    initial_value: "70.0"
+  - id: csp_zone5
+    type: float
+    restore_value: yes
+    initial_value: "75.0"
+  - id: hsp_zone6
+    type: float
+    restore_value: yes
+    initial_value: "70.0"
+  - id: csp_zone6
+    type: float
+    restore_value: yes
+    initial_value: "75.0"
 
 # ---------------------------------------------------------------------------
 # Transmit script — sends a JSON string as segmented CAN frames on 0x641
@@ -179,6 +219,116 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     lambda: "return id(csp_zone1);"
+    update_interval: 5s
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Heat Setpoint Zone 2"
+    id: heat_setpoint_z2
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: "return id(hsp_zone2);"
+    update_interval: 5s
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Cool Setpoint Zone 2"
+    id: cool_setpoint_z2
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: "return id(csp_zone2);"
+    update_interval: 5s
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Heat Setpoint Zone 3"
+    id: heat_setpoint_z3
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: "return id(hsp_zone3);"
+    update_interval: 5s
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Cool Setpoint Zone 3"
+    id: cool_setpoint_z3
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: "return id(csp_zone3);"
+    update_interval: 5s
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Heat Setpoint Zone 4"
+    id: heat_setpoint_z4
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: "return id(hsp_zone4);"
+    update_interval: 5s
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Cool Setpoint Zone 4"
+    id: cool_setpoint_z4
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: "return id(csp_zone4);"
+    update_interval: 5s
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Heat Setpoint Zone 5"
+    id: heat_setpoint_z5
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: "return id(hsp_zone5);"
+    update_interval: 5s
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Cool Setpoint Zone 5"
+    id: cool_setpoint_z5
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: "return id(csp_zone5);"
+    update_interval: 5s
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Heat Setpoint Zone 6"
+    id: heat_setpoint_z6
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: "return id(hsp_zone6);"
+    update_interval: 5s
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Cool Setpoint Zone 6"
+    id: cool_setpoint_z6
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: "return id(csp_zone6);"
     update_interval: 5s
     device_id: dev_thermostat
 
@@ -451,6 +601,26 @@ text_sensor:
     name: "Supply Air Fault"
     id: supply_air_fault
     device_id: dev_air_handler
+
+  - platform: template
+    name: "Active Alarm ID"
+    id: alarm_id
+    device_id: dev_sc360
+
+  - platform: template
+    name: "Active Alarm Origin"
+    id: alarm_origin
+    device_id: dev_sc360
+
+  - platform: template
+    name: "Active Alarm Level"
+    id: alarm_level
+    device_id: dev_sc360
+
+  - platform: template
+    name: "Weather Data Status"
+    id: weather_data_status
+    device_id: dev_thermostat
 
 # ---------------------------------------------------------------------------
 # Climate entity
@@ -743,6 +913,69 @@ canbus:
                     auto e = j.find("\"", zm);
                     if (e != std::string::npos)
                       id(zone_mode).publish_state(j.substr(zm, e-zm));
+                  }
+                }
+                // ZoneStatus zones 2–6 (Hsp/Csp per zone)
+                auto zst = j.find("\"ZoneStatus\"");
+                if (zst != std::string::npos) {
+                  auto parse_zone_sp = [&](const std::string &key, float &hsp, float &csp) {
+                    auto zp = j.find(key, zst);
+                    if (zp == std::string::npos) return;
+                    zp += key.size();
+                    auto ze = j.find("}", zp);
+                    if (ze == std::string::npos) return;
+                    std::string zd = j.substr(zp, ze - zp);
+                    auto hp = zd.find("\"Hsp\":\"");
+                    if (hp != std::string::npos) { hp += 7; auto e = zd.find("\"", hp); if (e != std::string::npos) hsp = atof(zd.substr(hp, e-hp).c_str()); }
+                    auto cp2 = zd.find("\"Csp\":\"");
+                    if (cp2 != std::string::npos) { cp2 += 7; auto e = zd.find("\"", cp2); if (e != std::string::npos) csp = atof(zd.substr(cp2, e-cp2).c_str()); }
+                  };
+                  parse_zone_sp("\"2\":{", id(hsp_zone2), id(csp_zone2));
+                  parse_zone_sp("\"3\":{", id(hsp_zone3), id(csp_zone3));
+                  parse_zone_sp("\"4\":{", id(hsp_zone4), id(csp_zone4));
+                  parse_zone_sp("\"5\":{", id(hsp_zone5), id(csp_zone5));
+                  parse_zone_sp("\"6\":{", id(hsp_zone6), id(csp_zone6));
+                }
+                // WeatherData (data freshness status)
+                auto wdpos = j.find("\"WeatherData\"");
+                if (wdpos != std::string::npos) {
+                  auto wd = j.find("\"D\":\"", wdpos);
+                  if (wd != std::string::npos) {
+                    wd += 5;
+                    auto e = j.find("\"", wd);
+                    if (e != std::string::npos)
+                      id(weather_data_status).publish_state(j.substr(wd, e-wd));
+                  }
+                }
+                // ActiveAlarms
+                auto aa = j.find("\"ActiveAlarms\"");
+                if (aa != std::string::npos) {
+                  if (j.find("\"Deleted\"", aa) != std::string::npos) {
+                    id(alarm_id).publish_state("cleared");
+                    id(alarm_origin).publish_state("");
+                    id(alarm_level).publish_state("");
+                  } else {
+                    auto aid = j.find("\"AlarmId\":\"", aa);
+                    if (aid != std::string::npos) {
+                      aid += 11;
+                      auto e = j.find("\"", aid);
+                      if (e != std::string::npos)
+                        id(alarm_id).publish_state(j.substr(aid, e-aid));
+                    }
+                    auto aor = j.find("\"Origin\":\"", aa);
+                    if (aor != std::string::npos) {
+                      aor += 10;
+                      auto e = j.find("\"", aor);
+                      if (e != std::string::npos)
+                        id(alarm_origin).publish_state(j.substr(aor, e-aor));
+                    }
+                    auto alv = j.find("\"Level\":\"", aa);
+                    if (alv != std::string::npos) {
+                      alv += 9;
+                      auto e = j.find("\"", alv);
+                      if (e != std::string::npos)
+                        id(alarm_level).publish_state(j.substr(alv, e-alv));
+                    }
                   }
                 }
                 id(buf_649) = "";
