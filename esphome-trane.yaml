@@ -30,6 +30,10 @@ logger:
     canbus: WARN
     can649: DEBUG
     can641: DEBUG
+    can490: DEBUG
+    can386: DEBUG
+    can5c9: DEBUG
+    can5c1: DEBUG
 
 api:
   services:
@@ -337,6 +341,28 @@ sensor:
     id: weather_humidity
     unit_of_measurement: "%"
     device_class: humidity
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: "return NAN;"
+    update_interval: 60s
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Weather Forecast High"
+    id: weather_forecast_high
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: "return NAN;"
+    update_interval: 60s
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Weather Forecast Low"
+    id: weather_forecast_low
+    unit_of_measurement: "°F"
+    device_class: temperature
     state_class: measurement
     accuracy_decimals: 0
     lambda: "return NAN;"
@@ -709,39 +735,42 @@ canbus:
               if ((seq & 0xF0) == 0xC0) {
                 id(buf_649) = "";
                 for (int i = 5; i < (int)x.size(); i++)
-                  if (x[i]) id(buf_649) += (char)x[i];
+                  if (x[i] && id(buf_649).size() < 512) id(buf_649) += (char)x[i];
               } else if (seq & 0x80) {
                 int used = (seq & 0x7F) - 1;
                 for (int i = 1; i <= used && i < (int)x.size(); i++) {
                   if (x[i] == 0) break;
-                  id(buf_649) += (char)x[i];
+                  if (id(buf_649).size() < 512) id(buf_649) += (char)x[i];
                 }
                 std::string j = id(buf_649);
                 id(last_json_649).publish_state(j);
                 ESP_LOGD("can649", "JSON: %s", j.c_str());
-                // Hsp
-                auto p = j.find("\"Hsp\":\"");
-                if (p != std::string::npos) {
-                  p += 7;
-                  auto e = j.find("\"", p);
-                  if (e != std::string::npos)
-                    id(hsp_zone1) = atof(j.substr(p, e-p).c_str());
-                }
-                // Csp
-                auto cp = j.find("\"Csp\":\"");
-                if (cp != std::string::npos) {
-                  cp += 7;
-                  auto e = j.find("\"", cp);
-                  if (e != std::string::npos)
-                    id(csp_zone1) = atof(j.substr(cp, e-cp).c_str());
-                }
-                // Sync climate setpoints whenever either changes
-                if (j.find("\"Hsp\":\"") != std::string::npos ||
-                    j.find("\"Csp\":\"") != std::string::npos) {
-                  auto *cl = id(trane_climate);
-                  cl->target_temperature_low  = id(hsp_zone1);
-                  cl->target_temperature_high = id(csp_zone1);
-                  cl->publish_state();
+                // Hsp/Csp zone 1 — anchored to SpOverride or ZoneStatus."1" only
+                // (prevents zones 2–6 setpoint broadcasts from polluting zone 1 globals)
+                {
+                  size_t z1s = std::string::npos, z1e_pos = std::string::npos;
+                  auto spo = j.find("\"SpOverride\"");
+                  if (spo != std::string::npos) {
+                    auto z1p = j.find("\"1\":{", spo);
+                    if (z1p != std::string::npos) { z1s = z1p + 5; z1e_pos = j.find("}", z1s); }
+                  }
+                  if (z1s == std::string::npos) {
+                    auto zst1 = j.find("\"ZoneStatus\"");
+                    if (zst1 != std::string::npos) {
+                      auto z1p = j.find("\"1\":{", zst1);
+                      if (z1p != std::string::npos) { z1s = z1p + 5; z1e_pos = j.find("}", z1s); }
+                    }
+                  }
+                  if (z1s != std::string::npos && z1e_pos != std::string::npos) {
+                    auto hp = j.find("\"Hsp\":\"", z1s);
+                    if (hp != std::string::npos && hp < z1e_pos) { hp += 7; id(hsp_zone1) = atof(j.c_str() + hp); }
+                    auto cp2 = j.find("\"Csp\":\"", z1s);
+                    if (cp2 != std::string::npos && cp2 < z1e_pos) { cp2 += 7; id(csp_zone1) = atof(j.c_str() + cp2); }
+                    auto *cl = id(trane_climate);
+                    cl->target_temperature_low  = id(hsp_zone1);
+                    cl->target_temperature_high = id(csp_zone1);
+                    cl->publish_state();
+                  }
                 }                // SystemOpStatus
                 auto sos = j.find("\"SystemOpStatus\"");
                 if (sos != std::string::npos) {
@@ -866,7 +895,16 @@ canbus:
                     if (e != std::string::npos)
                       id(weather_feels_like).publish_state(j.substr(wf, e-wf));
                   }
-                  // G = forecast high (°F) - already in README, no sensor needed yet
+                  // G = forecast high (°F)
+                  auto wg = j.find("\"G\":\"", wt);
+                  if (wg != std::string::npos) {
+                    wg += 5;
+                    auto e = j.find("\"", wg);
+                    if (e != std::string::npos) {
+                      float t = atof(j.substr(wg, e-wg).c_str());
+                      if (t > -20 && t < 130) id(weather_forecast_high).publish_state(t);
+                    }
+                  }
                   // H = condition code
                   auto wh = j.find("\"H\":\"", wt);
                   if (wh != std::string::npos) {
@@ -875,7 +913,16 @@ canbus:
                     if (e != std::string::npos)
                       id(weather_condition_code).publish_state(j.substr(wh, e-wh));
                   }
-                  // I = forecast low (°F) - already in README, no sensor needed yet
+                  // I = forecast low (°F)
+                  auto wi = j.find("\"I\":\"", wt);
+                  if (wi != std::string::npos) {
+                    wi += 5;
+                    auto e = j.find("\"", wi);
+                    if (e != std::string::npos) {
+                      float t = atof(j.substr(wi, e-wi).c_str());
+                      if (t > -20 && t < 130) id(weather_forecast_low).publish_state(t);
+                    }
+                  }
                 }
                 // IndoorStatus
                 auto ind = j.find("\"IndoorStatus\"");
@@ -924,11 +971,10 @@ canbus:
                     zp += key.size();
                     auto ze = j.find("}", zp);
                     if (ze == std::string::npos) return;
-                    std::string zd = j.substr(zp, ze - zp);
-                    auto hp = zd.find("\"Hsp\":\"");
-                    if (hp != std::string::npos) { hp += 7; auto e = zd.find("\"", hp); if (e != std::string::npos) hsp = atof(zd.substr(hp, e-hp).c_str()); }
-                    auto cp2 = zd.find("\"Csp\":\"");
-                    if (cp2 != std::string::npos) { cp2 += 7; auto e = zd.find("\"", cp2); if (e != std::string::npos) csp = atof(zd.substr(cp2, e-cp2).c_str()); }
+                    auto hp = j.find("\"Hsp\":\"", zp);
+                    if (hp != std::string::npos && hp < ze) { hp += 7; hsp = atof(j.c_str() + hp); }
+                    auto cp2 = j.find("\"Csp\":\"", zp);
+                    if (cp2 != std::string::npos && cp2 < ze) { cp2 += 7; csp = atof(j.c_str() + cp2); }
                   };
                   parse_zone_sp("\"2\":{", id(hsp_zone2), id(csp_zone2));
                   parse_zone_sp("\"3\":{", id(hsp_zone3), id(csp_zone3));
@@ -981,7 +1027,7 @@ canbus:
                 id(buf_649) = "";
               } else {
                 for (int i = 1; i < (int)x.size(); i++)
-                  if (x[i]) id(buf_649) += (char)x[i];
+                  if (x[i] && id(buf_649).size() < 512) id(buf_649) += (char)x[i];
               }
 
       # -----------------------------------------------------------------------
@@ -995,34 +1041,33 @@ canbus:
               if ((seq & 0xF0) == 0xC0) {
                 id(buf_641) = "";
                 for (int i = 5; i < (int)x.size(); i++)
-                  if (x[i]) id(buf_641) += (char)x[i];
+                  if (x[i] && id(buf_641).size() < 512) id(buf_641) += (char)x[i];
               } else if (seq & 0x80) {
                 int used = (seq & 0x7F) - 1;
                 for (int i = 1; i <= used && i < (int)x.size(); i++) {
                   if (x[i] == 0) break;
-                  id(buf_641) += (char)x[i];
+                  if (id(buf_641).size() < 512) id(buf_641) += (char)x[i];
                 }
                 std::string j = id(buf_641);
                 id(last_json_641).publish_state(j);
                 ESP_LOGD("can641", "JSON: %s", j.c_str());
-                auto p = j.find("\"Hsp\":\"");
-                if (p != std::string::npos) {
-                  p += 7;
-                  auto e = j.find("\"", p);
-                  if (e != std::string::npos)
-                    id(hsp_zone1) = atof(j.substr(p, e-p).c_str());
-                }
-                auto c = j.find("\"Csp\":\"");
-                if (c != std::string::npos) {
-                  c += 7;
-                  auto e = j.find("\"", c);
-                  if (e != std::string::npos)
-                    id(csp_zone1) = atof(j.substr(c, e-c).c_str());
+                // Hsp/Csp zone 1 — anchored to SpOverride."1" only
+                auto spo641 = j.find("\"SpOverride\"");
+                if (spo641 != std::string::npos) {
+                  auto z1p = j.find("\"1\":{", spo641);
+                  if (z1p != std::string::npos) {
+                    z1p += 5;
+                    auto z1e = j.find("}", z1p);
+                    if (z1e != std::string::npos) {
+                      auto hp = j.find("\"Hsp\":\"", z1p); if (hp != std::string::npos && hp < z1e) { hp += 7; id(hsp_zone1) = atof(j.c_str() + hp); }
+                      auto cp2 = j.find("\"Csp\":\"", z1p); if (cp2 != std::string::npos && cp2 < z1e) { cp2 += 7; id(csp_zone1) = atof(j.c_str() + cp2); }
+                    }
+                  }
                 }
                 id(buf_641) = "";
               } else {
                 for (int i = 1; i < (int)x.size(); i++)
-                  if (x[i]) id(buf_641) += (char)x[i];
+                  if (x[i] && id(buf_641).size() < 512) id(buf_641) += (char)x[i];
               }
 
       # -----------------------------------------------------------------------
@@ -1128,8 +1173,43 @@ canbus:
         can_id_mask: 0x7FF
         then:
           - lambda: |-
-              if (x.size() < 5) return;
-              ESP_LOGV("can490", "0x490 byte4=%d", x[4]);
+              char buf[40]; int pos = 0;
+              for (int i = 0; i < (int)x.size() && pos < 36; i++)
+                pos += snprintf(buf+pos, sizeof(buf)-pos, "%02X ", x[i]);
+              ESP_LOGD("can490", "0x490: %s", buf);
+
+      # 0x386 — unknown; in same 0x38x range as refrigerant sensors, likely a float
+      - can_id: 0x386
+        can_id_mask: 0x7FF
+        then:
+          - lambda: |-
+              char buf[40]; int pos = 0;
+              for (int i = 0; i < (int)x.size() && pos < 36; i++)
+                pos += snprintf(buf+pos, sizeof(buf)-pos, "%02X ", x[i]);
+              ESP_LOGD("can386", "0x386: %s", buf);
+              if (x.size() >= 4) {
+                float v; memcpy(&v, &x[0], 4);
+                ESP_LOGD("can386", "0x386 as float: %.2f", v);
+              }
+
+      # 0x5C9 / 0x5C1 — unknown; logging raw bytes for analysis
+      - can_id: 0x5C9
+        can_id_mask: 0x7FF
+        then:
+          - lambda: |-
+              char buf[40]; int pos = 0;
+              for (int i = 0; i < (int)x.size() && pos < 36; i++)
+                pos += snprintf(buf+pos, sizeof(buf)-pos, "%02X ", x[i]);
+              ESP_LOGD("can5c9", "0x5C9: %s", buf);
+
+      - can_id: 0x5C1
+        can_id_mask: 0x7FF
+        then:
+          - lambda: |-
+              char buf[40]; int pos = 0;
+              for (int i = 0; i < (int)x.size() && pos < 36; i++)
+                pos += snprintf(buf+pos, sizeof(buf)-pos, "%02X ", x[i]);
+              ESP_LOGD("can5c1", "0x5C1: %s", buf);
 
       # -----------------------------------------------------------------------
       # Catchall — silenced to VERBOSE
@@ -1139,10 +1219,11 @@ canbus:
         then:
           - lambda: |-
               switch (can_id) {
-                case 0x649: case 0x641: case 0x5C9: case 0x5C1:
+                case 0x649: case 0x641:
                 case 0x283: case 0x308: case 0x387: case 0x383:
                 case 0x381: case 0x38F: case 0x410: case 0x430:
                 case 0x450: case 0x490: case 0x386: case 0x380:
+                case 0x5C9: case 0x5C1:
                   return;
               }
               char buf[80];
@@ -1150,3 +1231,7 @@ canbus:
               for (int i = 0; i < (int)x.size() && pos < 72; i++)
                 pos += snprintf(buf+pos, sizeof(buf)-pos, "%02X ", x[i]);
               ESP_LOGV("canbus", "%s", buf);
+
+esp32_ble_tracker:
+
+bluetooth_proxy:
