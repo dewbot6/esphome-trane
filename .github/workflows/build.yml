@@ -20,8 +20,8 @@ jobs:
       - name: Create secrets.yaml for CI build
         run: |
           cat > secrets.yaml << 'EOF'
-          wifi_ssid: ""
-          wifi_password: ""
+          wifi_ssid: "configure-me"
+          wifi_password: "configure-me"
           EOF
 
       - name: Build ESPHome firmware
