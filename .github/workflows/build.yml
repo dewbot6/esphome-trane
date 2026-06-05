@@ -1,0 +1,51 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build firmware
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: ver
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Build ESPHome firmware
+        uses: esphome/build-action@v6
+        id: build
+        with:
+          yaml-file: esphome-trane.yaml
+          substitutions: "version=${{ steps.ver.outputs.VERSION }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "v${{ steps.ver.outputs.VERSION }}"
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ startsWith(steps.ver.outputs.VERSION, '0.') }}
+          body: |
+            ## ESPHome Trane HVAC v${{ steps.ver.outputs.VERSION }}
+
+            ### Installation
+            Flash using [ESP Web Tools](https://web.esphome.io/) or ESPHome CLI:
+            ```
+            esphome upload --file esphome-trane-firmware.bin
+            ```
+
+            > **First install:** Use the full `factory` binary which includes the bootloader.
+            > **OTA updates:** Use the standard `firmware` binary.
+
+            ### Compatibility
+            - Hardware: ESP32-S3 DevKitC-1
+            - Trane ComfortLink II systems with SC360 controller
+            - CAN bus: 50kbps
+          files: |
+            ${{ steps.build.outputs.name }}/*.bin

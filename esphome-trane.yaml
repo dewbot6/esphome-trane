@@ -1,6 +1,12 @@
+substitutions:
+  version: "dev"
+
 esphome:
   name: esphome-trane
   friendly_name: ESPHome Trane
+  project:
+    name: "andrewsnodgrass.trane-hvac"
+    version: ${version}
 
   on_boot:
     priority: -100
@@ -80,6 +86,9 @@ api:
 
 ota:
   - platform: esphome
+
+web_server:
+  port: 80
 
 wifi:
   networks:
