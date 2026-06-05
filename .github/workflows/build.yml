@@ -17,6 +17,13 @@ jobs:
         id: ver
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
+      - name: Create secrets.yaml for CI build
+        run: |
+          cat > secrets.yaml << 'EOF'
+          wifi_ssid: ""
+          wifi_password: ""
+          EOF
+
       - name: Build ESPHome firmware
         uses: esphome/build-action@v6
         id: build
