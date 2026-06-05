@@ -515,7 +515,7 @@ sensor:
 
   # --- Heat Pump ------------------------------------------------------------
   - platform: template
-    name: "Outdoor Coil Temp"
+    name: "Refrig Circuit Temp"
     id: outdoor_coil_temp
     unit_of_measurement: "°F"
     device_class: temperature
