@@ -2,6 +2,17 @@ esphome:
   name: esphome-trane
   friendly_name: ESPHome Trane
 
+  on_boot:
+    priority: -100
+    then:
+      - delay: 3s
+      - lambda: |-
+          // Restore last known mode immediately so climate entity isn't stuck at OFF
+          if (!id(last_mode).empty())
+            id(system_mode).publish_state(id(last_mode));
+          // Also request current state from SC360
+          id(can_transmit_json).execute(std::string("{\"GetProfile\":\"SYSOP\"}"));
+
   devices:
     - id: dev_thermostat
       name: "Trane Thermostat UX360"
@@ -95,44 +106,72 @@ globals:
     initial_value: "75.0"
   - id: hsp_zone2
     type: float
-    restore_value: yes
+    restore_value: no
     initial_value: "70.0"
   - id: csp_zone2
     type: float
-    restore_value: yes
+    restore_value: no
     initial_value: "75.0"
   - id: hsp_zone3
     type: float
-    restore_value: yes
+    restore_value: no
     initial_value: "70.0"
   - id: csp_zone3
     type: float
-    restore_value: yes
+    restore_value: no
     initial_value: "75.0"
   - id: hsp_zone4
     type: float
-    restore_value: yes
+    restore_value: no
     initial_value: "70.0"
   - id: csp_zone4
     type: float
-    restore_value: yes
+    restore_value: no
     initial_value: "75.0"
   - id: hsp_zone5
     type: float
-    restore_value: yes
+    restore_value: no
     initial_value: "70.0"
   - id: csp_zone5
     type: float
-    restore_value: yes
+    restore_value: no
     initial_value: "75.0"
   - id: hsp_zone6
     type: float
-    restore_value: yes
+    restore_value: no
     initial_value: "70.0"
   - id: csp_zone6
     type: float
-    restore_value: yes
+    restore_value: no
     initial_value: "75.0"
+  - id: preset_home_hsp
+    type: float
+    restore_value: no
+    initial_value: "68.0"
+  - id: preset_home_csp
+    type: float
+    restore_value: no
+    initial_value: "72.0"
+  - id: preset_away_hsp
+    type: float
+    restore_value: no
+    initial_value: "65.0"
+  - id: preset_away_csp
+    type: float
+    restore_value: no
+    initial_value: "82.0"
+  - id: preset_sleep_hsp
+    type: float
+    restore_value: no
+    initial_value: "66.0"
+  - id: preset_sleep_csp
+    type: float
+    restore_value: no
+    initial_value: "70.0"
+  - id: last_mode
+    type: std::string
+    restore_value: yes
+    initial_value: '"off"'
 
 # ---------------------------------------------------------------------------
 # Transmit script — sends a JSON string as segmented CAN frames on 0x641
@@ -229,6 +268,7 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 0
+    disabled_by_default: true
     lambda: "return id(hsp_zone2);"
     update_interval: 5s
     device_id: dev_thermostat
@@ -240,6 +280,7 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 0
+    disabled_by_default: true
     lambda: "return id(csp_zone2);"
     update_interval: 5s
     device_id: dev_thermostat
@@ -251,6 +292,7 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 0
+    disabled_by_default: true
     lambda: "return id(hsp_zone3);"
     update_interval: 5s
     device_id: dev_thermostat
@@ -262,6 +304,7 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 0
+    disabled_by_default: true
     lambda: "return id(csp_zone3);"
     update_interval: 5s
     device_id: dev_thermostat
@@ -273,6 +316,7 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 0
+    disabled_by_default: true
     lambda: "return id(hsp_zone4);"
     update_interval: 5s
     device_id: dev_thermostat
@@ -284,6 +328,7 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 0
+    disabled_by_default: true
     lambda: "return id(csp_zone4);"
     update_interval: 5s
     device_id: dev_thermostat
@@ -295,6 +340,7 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 0
+    disabled_by_default: true
     lambda: "return id(hsp_zone5);"
     update_interval: 5s
     device_id: dev_thermostat
@@ -306,6 +352,7 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 0
+    disabled_by_default: true
     lambda: "return id(csp_zone5);"
     update_interval: 5s
     device_id: dev_thermostat
@@ -317,6 +364,7 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 0
+    disabled_by_default: true
     lambda: "return id(hsp_zone6);"
     update_interval: 5s
     device_id: dev_thermostat
@@ -328,6 +376,7 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 0
+    disabled_by_default: true
     lambda: "return id(csp_zone6);"
     update_interval: 5s
     device_id: dev_thermostat
@@ -406,7 +455,7 @@ sensor:
 
   # --- Air Handler ----------------------------------------------------------
   - platform: template
-    name: "Indoor Temp 1"
+    name: "AHU Inlet Air Temp"
     id: indoor_temp
     unit_of_measurement: "°F"
     device_class: temperature
@@ -415,7 +464,7 @@ sensor:
     device_id: dev_air_handler
 
   - platform: template
-    name: "Indoor Temp 2"
+    name: "Indoor Coil Temp"
     id: indoor_temp2
     unit_of_measurement: "°F"
     device_class: temperature
@@ -424,7 +473,7 @@ sensor:
     device_id: dev_air_handler
 
   - platform: template
-    name: "Supply Air Temp"
+    name: "Return Air Temp"
     id: supply_air_temp
     unit_of_measurement: "°F"
     device_class: temperature
@@ -433,7 +482,7 @@ sensor:
     device_id: dev_air_handler
 
   - platform: template
-    name: "Heat Exchanger Temp"
+    name: "Supply Air Temp"
     id: supply_air_temp2
     unit_of_measurement: "°F"
     device_class: temperature
@@ -509,6 +558,111 @@ sensor:
     state_class: measurement
     accuracy_decimals: 0
     device_id: dev_heat_pump
+
+  # Second float from 0x386 — varies with refrigerant conditions (~35-43°F)
+  # Likely a refrigerant line temperature; identity TBD from more data
+  - platform: template
+    name: "Refrig Sensor B"
+    id: refrig_sensor_b
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    device_id: dev_heat_pump
+
+  # --- Preset setpoints (from PresetSettings on 0x649) ----------------------
+  - platform: template
+    name: "Preset Home Heat"
+    id: preset_home_heat
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: "return id(preset_home_hsp);"
+    update_interval: 60s
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Preset Home Cool"
+    id: preset_home_cool
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: "return id(preset_home_csp);"
+    update_interval: 60s
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Preset Away Heat"
+    id: preset_away_heat
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: "return id(preset_away_hsp);"
+    update_interval: 60s
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Preset Away Cool"
+    id: preset_away_cool
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: "return id(preset_away_csp);"
+    update_interval: 60s
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Preset Sleep Heat"
+    id: preset_sleep_heat
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: "return id(preset_sleep_hsp);"
+    update_interval: 60s
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Preset Sleep Cool"
+    id: preset_sleep_cool
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: "return id(preset_sleep_csp);"
+    update_interval: 60s
+    device_id: dev_thermostat
+
+  # --- SC360 outdoor widget temp (high-precision, from OdWidget on 0x649) ---
+  - platform: template
+    name: "Outdoor Widget Temp"
+    id: od_widget_temp
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 2
+    device_id: dev_sc360
+
+  # --- Zone 1 airflow / state / demand (from ZoneStatus.1 on 0x649) ---------
+  - platform: template
+    name: "Zone 1 Airflow"
+    id: zone1_airflow
+    unit_of_measurement: "%"
+    state_class: measurement
+    accuracy_decimals: 0
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Zone 1 Demand Pct"
+    id: zone1_demand_pct_z
+    unit_of_measurement: "%"
+    state_class: measurement
+    accuracy_decimals: 0
+    device_id: dev_thermostat
 
 # ---------------------------------------------------------------------------
 # Text sensors
@@ -604,6 +758,133 @@ text_sensor:
     id: weather_data_status
     device_id: dev_thermostat
 
+  - platform: template
+    name: "Weather ZIP"
+    id: weather_zip
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Weather City"
+    id: weather_city
+    device_id: dev_thermostat
+
+  # --- Unit identification (from UnitID on 0x641) ---------------------------
+  - platform: template
+    name: "Unit Model"
+    id: unit_model
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Unit Serial"
+    id: unit_serial
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Unit Firmware"
+    id: unit_firmware
+    device_id: dev_thermostat
+
+  # --- Outdoor unit fault (from OdStatus.D on 0x649) -------------------------
+  - platform: template
+    name: "OD Fault Code"
+    id: od_fault_code
+    device_id: dev_heat_pump
+
+  # --- Air handler humidity/ventilation (from IndoorStatus on 0x649) ---------
+  - platform: template
+    name: "Hum Control"
+    id: hum_control
+    device_id: dev_air_handler
+
+  - platform: template
+    name: "Humidifier Status"
+    id: humidifier_status
+    device_id: dev_air_handler
+
+  - platform: template
+    name: "Dehumidifier Status"
+    id: dehumidifier_status
+    device_id: dev_air_handler
+
+  - platform: template
+    name: "Ventilator Status"
+    id: ventilator_status
+    device_id: dev_air_handler
+
+  # --- Thermostat config (from various 0x649 messages) ----------------------
+  - platform: template
+    name: "Schedule Enabled"
+    id: schedule_enabled
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Setpoint Source"
+    id: setpoint_source
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Zone 1 State"
+    id: zone1_state
+    device_id: dev_thermostat
+
+  # --- Zone names (from ZoneCardState on 0x649) -----------------------------
+  - platform: template
+    name: "Zone 1 Name"
+    id: zone_name_1
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Zone 2 Name"
+    id: zone_name_2
+    disabled_by_default: true
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Zone 3 Name"
+    id: zone_name_3
+    disabled_by_default: true
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Zone 4 Name"
+    id: zone_name_4
+    disabled_by_default: true
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Zone 5 Name"
+    id: zone_name_5
+    disabled_by_default: true
+    device_id: dev_thermostat
+
+  - platform: template
+    name: "Zone 6 Name"
+    id: zone_name_6
+    disabled_by_default: true
+    device_id: dev_thermostat
+
+  # --- Firmware versions (from VersionDetails on 0x649) ---------------------
+  - platform: template
+    name: "Config Version"
+    id: config_version
+    device_id: dev_sc360
+
+  - platform: template
+    name: "Alarm DB Version"
+    id: alarm_db_version
+    device_id: dev_sc360
+
+  # --- Second active alarm slot (from ActiveAlarms on 0x649) ----------------
+  - platform: template
+    name: "Active Alarm ID 2"
+    id: alarm_id_2
+    device_id: dev_sc360
+
+  - platform: template
+    name: "Active Alarm Origin 2"
+    id: alarm_origin_2
+    device_id: dev_sc360
+
 # ---------------------------------------------------------------------------
 # Climate entity
 # ---------------------------------------------------------------------------
@@ -650,13 +931,13 @@ climate:
           payload: !lambda |-
             float hsp, csp;
             if (preset == climate::CLIMATE_PRESET_HOME) {
-              hsp = 70; csp = 75;
+              hsp = id(preset_home_hsp); csp = id(preset_home_csp);
             } else if (preset == climate::CLIMATE_PRESET_AWAY) {
-              hsp = 62; csp = 85;
+              hsp = id(preset_away_hsp); csp = id(preset_away_csp);
             } else if (preset == climate::CLIMATE_PRESET_SLEEP) {
-              hsp = 67; csp = 72;
+              hsp = id(preset_sleep_hsp); csp = id(preset_sleep_csp);
             } else if (preset == climate::CLIMATE_PRESET_BOOST) {
-              hsp = 74; csp = 72;
+              hsp = 74; csp = 72;  // Boost: no Trane equivalent, keep hardcoded
             } else {
               hsp = id(hsp_zone1); csp = id(csp_zone1);
             }
@@ -722,10 +1003,32 @@ canbus:
                     if (hp != std::string::npos && hp < z1e_pos) { hp += 7; id(hsp_zone1) = atof(j.c_str() + hp); }
                     auto cp2 = j.find("\"Csp\":\"", z1s);
                     if (cp2 != std::string::npos && cp2 < z1e_pos) { cp2 += 7; id(csp_zone1) = atof(j.c_str() + cp2); }
+                    // Source (SpOverride only — "2"=thermostat direct, "1"=system default)
+                    auto src = j.find("\"Source\":\"", z1s);
+                    if (src != std::string::npos && src < z1e_pos) { src += 10; auto e = j.find("\"", src); if (e != std::string::npos) id(setpoint_source).publish_state(j.substr(src, e-src)); }
                     auto *cl = id(trane_climate);
-                    cl->target_temperature_low  = id(hsp_zone1);
-                    cl->target_temperature_high = id(csp_zone1);
+                    cl->target_temperature_low  = (id(hsp_zone1) - 32.0f) * 5.0f / 9.0f;
+                    cl->target_temperature_high = (id(csp_zone1) - 32.0f) * 5.0f / 9.0f;
                     cl->publish_state();
+                  }
+                  // ZoneStatus zone 1 — E (airflow %), F (state), G (demand %)
+                  {
+                    auto zst1_pos = j.find("\"ZoneStatus\"");
+                    if (zst1_pos != std::string::npos) {
+                      auto z1b = j.find("\"1\":{", zst1_pos);
+                      if (z1b != std::string::npos) {
+                        z1b += 5;
+                        auto z1_end = j.find("}", z1b);
+                        if (z1_end != std::string::npos) {
+                          auto ep = j.find("\"E\":\"", z1b);
+                          if (ep != std::string::npos && ep < z1_end) { ep += 5; float v = atof(j.c_str() + ep); if (v >= 0 && v <= 100) id(zone1_airflow).publish_state(v); }
+                          auto fp = j.find("\"F\":\"", z1b);
+                          if (fp != std::string::npos && fp < z1_end) { fp += 5; auto e = j.find("\"", fp); if (e != std::string::npos) id(zone1_state).publish_state(j.substr(fp, e-fp)); }
+                          auto gp = j.find("\"G\":\"", z1b);
+                          if (gp != std::string::npos && gp < z1_end) { gp += 5; auto e = j.find("\"", gp); if (e != std::string::npos && gp < e) { std::string gs = j.substr(gp, e-gp); if (!gs.empty()) id(zone1_demand_pct_z).publish_state(atof(gs.c_str())); } }
+                        }
+                      }
+                    }
                   }
                 }                // SystemOpStatus
                 auto sos = j.find("\"SystemOpStatus\"");
@@ -740,6 +1043,7 @@ canbus:
                                          bval == "B" ? "cool" :
                                          bval == "C" ? "off" : bval;
                       id(system_mode).publish_state(mode);
+                      id(last_mode) = mode;  // persist across reboots
                     }
                   }
                   auto c_pos = j.find("\"C\":\"", sos);
@@ -821,6 +1125,9 @@ canbus:
                       if (hz > 0) id(compressor_freq).publish_state(hz);
                     }
                   }
+                  // D = fault code
+                  auto od_d = j.find("\"D\":\"", od);
+                  if (od_d != std::string::npos) { od_d += 5; auto e = j.find("\"", od_d); if (e != std::string::npos) id(od_fault_code).publish_state(j.substr(od_d, e-od_d)); }
                 }
                 // WeatherToday
                 auto wt = j.find("\"WeatherToday\"");
@@ -879,6 +1186,9 @@ canbus:
                       if (t > -20 && t < 130) id(weather_forecast_low).publish_state(t);
                     }
                   }
+                  // C = city name
+                  auto wc_city = j.find("\"C\":\"", wt);
+                  if (wc_city != std::string::npos) { wc_city += 5; auto e = j.find("\"", wc_city); if (e != std::string::npos) id(weather_city).publish_state(j.substr(wc_city, e-wc_city)); }
                 }
                 // IndoorStatus
                 auto ind = j.find("\"IndoorStatus\"");
@@ -906,6 +1216,15 @@ canbus:
                     if (e != std::string::npos)
                       id(indoor_unit_state).publish_state(j.substr(id_pos, e-id_pos));
                   }
+                  // Humidity and ventilation control fields
+                  auto hmc = j.find("\"HumControl\":\"", ind);
+                  if (hmc != std::string::npos) { hmc += 14; auto e = j.find("\"", hmc); if (e != std::string::npos) id(hum_control).publish_state(j.substr(hmc, e-hmc)); }
+                  auto hms = j.find("\"HumidifierStatus\":\"", ind);
+                  if (hms != std::string::npos) { hms += 20; auto e = j.find("\"", hms); if (e != std::string::npos) id(humidifier_status).publish_state(j.substr(hms, e-hms)); }
+                  auto dhs = j.find("\"DehumidifierStatus\":\"", ind);
+                  if (dhs != std::string::npos) { dhs += 22; auto e = j.find("\"", dhs); if (e != std::string::npos) id(dehumidifier_status).publish_state(j.substr(dhs, e-dhs)); }
+                  auto vts = j.find("\"VentilatorStatus\":\"", ind);
+                  if (vts != std::string::npos) { vts += 20; auto e = j.find("\"", vts); if (e != std::string::npos) id(ventilator_status).publish_state(j.substr(vts, e-vts)); }
                 }
                 // ZoneSettings
                 auto zs = j.find("\"ZoneSettings\"");
@@ -938,7 +1257,7 @@ canbus:
                   parse_zone_sp("\"5\":{", id(hsp_zone5), id(csp_zone5));
                   parse_zone_sp("\"6\":{", id(hsp_zone6), id(csp_zone6));
                 }
-                // WeatherData (data freshness status)
+                // WeatherData (data freshness status + ZIP code)
                 auto wdpos = j.find("\"WeatherData\"");
                 if (wdpos != std::string::npos) {
                   auto wd = j.find("\"D\":\"", wdpos);
@@ -948,6 +1267,9 @@ canbus:
                     if (e != std::string::npos)
                       id(weather_data_status).publish_state(j.substr(wd, e-wd));
                   }
+                  // A = ZIP code
+                  auto wa = j.find("\"A\":\"", wdpos);
+                  if (wa != std::string::npos) { wa += 5; auto e = j.find("\"", wa); if (e != std::string::npos) id(weather_zip).publish_state(j.substr(wa, e-wa)); }
                 }
                 // ActiveAlarms
                 auto aa = j.find("\"ActiveAlarms\"");
@@ -956,20 +1278,32 @@ canbus:
                     id(alarm_id).publish_state("cleared");
                     id(alarm_origin).publish_state("");
                     id(alarm_level).publish_state("");
+                    id(alarm_id_2).publish_state("");
+                    id(alarm_origin_2).publish_state("");
                   } else {
+                    // First alarm
                     auto aid = j.find("\"AlarmId\":\"", aa);
                     if (aid != std::string::npos) {
-                      aid += 11;
-                      auto e = j.find("\"", aid);
-                      if (e != std::string::npos)
-                        id(alarm_id).publish_state(j.substr(aid, e-aid));
+                      size_t aid_val = aid + 11;
+                      auto e1 = j.find("\"", aid_val);
+                      if (e1 != std::string::npos) {
+                        id(alarm_id).publish_state(j.substr(aid_val, e1-aid_val));
+                        // Second alarm (if any)
+                        auto aid2 = j.find("\"AlarmId\":\"", e1);
+                        if (aid2 != std::string::npos) { aid2 += 11; auto e2 = j.find("\"", aid2); if (e2 != std::string::npos) id(alarm_id_2).publish_state(j.substr(aid2, e2-aid2)); }
+                        else id(alarm_id_2).publish_state("");
+                      }
                     }
                     auto aor = j.find("\"Origin\":\"", aa);
                     if (aor != std::string::npos) {
-                      aor += 10;
-                      auto e = j.find("\"", aor);
-                      if (e != std::string::npos)
-                        id(alarm_origin).publish_state(j.substr(aor, e-aor));
+                      size_t aor_val = aor + 10;
+                      auto e1 = j.find("\"", aor_val);
+                      if (e1 != std::string::npos) {
+                        id(alarm_origin).publish_state(j.substr(aor_val, e1-aor_val));
+                        auto aor2 = j.find("\"Origin\":\"", e1);
+                        if (aor2 != std::string::npos) { aor2 += 10; auto e2 = j.find("\"", aor2); if (e2 != std::string::npos) id(alarm_origin_2).publish_state(j.substr(aor2, e2-aor2)); }
+                        else id(alarm_origin_2).publish_state("");
+                      }
                     }
                     auto alv = j.find("\"Level\":\"", aa);
                     if (alv != std::string::npos) {
@@ -979,6 +1313,60 @@ canbus:
                         id(alarm_level).publish_state(j.substr(alv, e-alv));
                     }
                   }
+                }
+                // PresetSettings (Home/Away/Sleep Hsp/Csp)
+                auto pset = j.find("\"PresetSettings\"");
+                if (pset != std::string::npos) {
+                  auto parse_preset = [&](const std::string &key, float &hsp, float &csp) {
+                    auto pp = j.find(key, pset);
+                    if (pp == std::string::npos) return;
+                    pp += key.size();
+                    auto pe = j.find("}", pp);
+                    if (pe == std::string::npos) return;
+                    auto hh = j.find("\"Hsp\":\"", pp); if (hh != std::string::npos && hh < pe) { hh += 7; hsp = atof(j.c_str() + hh); }
+                    auto ch = j.find("\"Csp\":\"", pp); if (ch != std::string::npos && ch < pe) { ch += 7; csp = atof(j.c_str() + ch); }
+                  };
+                  parse_preset("\"Home\":{", id(preset_home_hsp), id(preset_home_csp));
+                  parse_preset("\"Away\":{", id(preset_away_hsp), id(preset_away_csp));
+                  parse_preset("\"Sleep\":{", id(preset_sleep_hsp), id(preset_sleep_csp));
+                }
+                // ZoneCardState (zone names)
+                auto zcs = j.find("\"ZoneCardState\"");
+                if (zcs != std::string::npos) {
+                  auto parse_zone_name = [&](const std::string &key, size_t start) -> std::string {
+                    auto zp = j.find(key, start); if (zp == std::string::npos) return "";
+                    zp += key.size();
+                    auto ze = j.find("}", zp); if (ze == std::string::npos) return "";
+                    auto bp = j.find("\"B\":\"", zp); if (bp == std::string::npos || bp > ze) return "";
+                    bp += 5; auto ep = j.find("\"", bp); if (ep == std::string::npos || ep > ze) return "";
+                    return j.substr(bp, ep - bp);
+                  };
+                  auto n1 = parse_zone_name("\"1\":{", zcs); if (!n1.empty()) id(zone_name_1).publish_state(n1);
+                  auto n2 = parse_zone_name("\"2\":{", zcs); if (!n2.empty()) id(zone_name_2).publish_state(n2);
+                  auto n3 = parse_zone_name("\"3\":{", zcs); if (!n3.empty()) id(zone_name_3).publish_state(n3);
+                  auto n4 = parse_zone_name("\"4\":{", zcs); if (!n4.empty()) id(zone_name_4).publish_state(n4);
+                  auto n5 = parse_zone_name("\"5\":{", zcs); if (!n5.empty()) id(zone_name_5).publish_state(n5);
+                  auto n6 = parse_zone_name("\"6\":{", zcs); if (!n6.empty()) id(zone_name_6).publish_state(n6);
+                }
+                // VersionDetails
+                auto vd = j.find("\"VersionDetails\"");
+                if (vd != std::string::npos) {
+                  auto cpv = j.find("\"ConfigPropertiesVersion\":\"", vd);
+                  if (cpv != std::string::npos) { cpv += 27; auto e = j.find("\"", cpv); if (e != std::string::npos) id(config_version).publish_state(j.substr(cpv, e-cpv)); }
+                  auto adv = j.find("\"AlarmDetailsVersion\":\"", vd);
+                  if (adv != std::string::npos) { adv += 23; auto e = j.find("\"", adv); if (e != std::string::npos) id(alarm_db_version).publish_state(j.substr(adv, e-adv)); }
+                }
+                // OdWidget (high-precision outdoor temp)
+                auto odw = j.find("\"OdWidget\"");
+                if (odw != std::string::npos) {
+                  auto wa = j.find("\"A\":\"", odw);
+                  if (wa != std::string::npos) { wa += 5; float t = atof(j.c_str() + wa); if (t > -40 && t < 130) id(od_widget_temp).publish_state(t); }
+                }
+                // ScheduleSettings
+                auto sch = j.find("\"ScheduleSettings\"");
+                if (sch != std::string::npos) {
+                  auto we = j.find("\"WeeklySchEnable\":\"", sch);
+                  if (we != std::string::npos) { we += 19; auto e = j.find("\"", we); if (e != std::string::npos) id(schedule_enabled).publish_state(j.substr(we, e-we)); }
                 }
                 id(buf_649) = "";
               } else {
@@ -1019,6 +1407,16 @@ canbus:
                       auto cp2 = j.find("\"Csp\":\"", z1p); if (cp2 != std::string::npos && cp2 < z1e) { cp2 += 7; id(csp_zone1) = atof(j.c_str() + cp2); }
                     }
                   }
+                }
+                // UnitID (model, serial, firmware — sent by UX360 on startup)
+                auto uid = j.find("\"UnitID\"");
+                if (uid != std::string::npos) {
+                  auto mn = j.find("\"ModelNumber\":\"", uid);
+                  if (mn != std::string::npos) { mn += 15; auto e = j.find("\"", mn); if (e != std::string::npos) id(unit_model).publish_state(j.substr(mn, e-mn)); }
+                  auto sn = j.find("\"SerialNumber\":\"", uid);
+                  if (sn != std::string::npos) { sn += 16; auto e = j.find("\"", sn); if (e != std::string::npos) id(unit_serial).publish_state(j.substr(sn, e-sn)); }
+                  auto bi = j.find("\"BuildInfo\":\"", uid);
+                  if (bi != std::string::npos) { bi += 13; auto e = j.find("\"", bi); if (e != std::string::npos) id(unit_firmware).publish_state(j.substr(bi, e-bi)); }
                 }
                 id(buf_641) = "";
               } else {
@@ -1134,19 +1532,17 @@ canbus:
                 pos += snprintf(buf+pos, sizeof(buf)-pos, "%02X ", x[i]);
               ESP_LOGD("can490", "0x490: %s", buf);
 
-      # 0x386 — unknown; in same 0x38x range as refrigerant sensors, likely a float
+      # 0x386 — two floats; float 1 = constant 50°F (unknown), float 2 = varies with refrigerant
       - can_id: 0x386
         can_id_mask: 0x7FF
         then:
           - lambda: |-
-              char buf[40]; int pos = 0;
-              for (int i = 0; i < (int)x.size() && pos < 36; i++)
-                pos += snprintf(buf+pos, sizeof(buf)-pos, "%02X ", x[i]);
-              ESP_LOGD("can386", "0x386: %s", buf);
-              if (x.size() >= 4) {
-                float v; memcpy(&v, &x[0], 4);
-                ESP_LOGD("can386", "0x386 as float: %.2f", v);
-              }
+              if (x.size() < 8) return;
+              float v1, v2;
+              memcpy(&v1, &x[0], 4);
+              memcpy(&v2, &x[4], 4);
+              ESP_LOGD("can386", "0x386: %.2f / %.2f", v1, v2);
+              if (v2 > -40 && v2 < 130) id(refrig_sensor_b).publish_state(v2);
 
       # 0x5C9 / 0x5C1 — unknown; logging raw bytes for analysis
       - can_id: 0x5C9
