@@ -189,8 +189,6 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 1
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_thermostat
 
   - platform: template
@@ -200,8 +198,6 @@ sensor:
     device_class: humidity
     state_class: measurement
     accuracy_decimals: 1
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_thermostat
 
   - platform: template
@@ -343,8 +339,6 @@ sensor:
     device_class: humidity
     state_class: measurement
     accuracy_decimals: 0
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_thermostat
 
   - platform: template
@@ -354,8 +348,6 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 0
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_thermostat
 
   - platform: template
@@ -365,8 +357,6 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 0
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_thermostat
 
   # --- SC360 Controller -----------------------------------------------------
@@ -376,8 +366,6 @@ sensor:
     unit_of_measurement: "%"
     state_class: measurement
     accuracy_decimals: 0
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_sc360
 
   - platform: template
@@ -387,8 +375,6 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 1
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_sc360
 
   - platform: template
@@ -398,8 +384,6 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 1
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_sc360
 
   - platform: template
@@ -409,8 +393,6 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 1
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_sc360
 
   - platform: template
@@ -420,8 +402,6 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 1
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_sc360
 
   # --- Air Handler ----------------------------------------------------------
@@ -432,8 +412,6 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 1
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_air_handler
 
   - platform: template
@@ -443,8 +421,6 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 1
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_air_handler
 
   - platform: template
@@ -454,8 +430,6 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 1
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_air_handler
 
   - platform: template
@@ -465,8 +439,6 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 1
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_air_handler
 
   - platform: template
@@ -475,8 +447,6 @@ sensor:
     unit_of_measurement: "%"
     state_class: measurement
     accuracy_decimals: 0
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_air_handler
 
   # --- Heat Pump ------------------------------------------------------------
@@ -487,8 +457,6 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 1
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_heat_pump
 
   - platform: template
@@ -498,8 +466,6 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 1
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_heat_pump
 
   - platform: template
@@ -509,8 +475,6 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 1
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_heat_pump
 
   - platform: template
@@ -520,8 +484,6 @@ sensor:
     device_class: temperature
     state_class: measurement
     accuracy_decimals: 1
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_heat_pump
 
   - platform: template
@@ -530,8 +492,6 @@ sensor:
     unit_of_measurement: "PSI"
     state_class: measurement
     accuracy_decimals: 1
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_heat_pump
 
   - platform: template
@@ -540,8 +500,6 @@ sensor:
     unit_of_measurement: "%"
     state_class: measurement
     accuracy_decimals: 0
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_heat_pump
 
   - platform: template
@@ -550,8 +508,6 @@ sensor:
     unit_of_measurement: "Hz"
     state_class: measurement
     accuracy_decimals: 0
-    lambda: "return NAN;"
-    update_interval: 60s
     device_id: dev_heat_pump
 
 # ---------------------------------------------------------------------------
