@@ -453,14 +453,6 @@ sensor:
     accuracy_decimals: 1
     device_id: dev_sc360
 
-  - platform: template
-    name: "SC360 Outdoor Temp"
-    id: sc360_outdoor_temp
-    unit_of_measurement: "°F"
-    device_class: temperature
-    state_class: measurement
-    accuracy_decimals: 1
-    device_id: dev_sc360
 
   # --- Air Handler ----------------------------------------------------------
   - platform: template
@@ -1113,16 +1105,10 @@ canbus:
                     e_pos += 5;
                     auto e = j.find("\"", e_pos);
                     if (e != std::string::npos) {
-                      std::string estr = j.substr(e_pos, e-e_pos);
-                      // Values with decimal point (e.g. "28.00") are SC360 outdoor temp
-                      // Integer values (e.g. "42") are indoor humidity %
-                      if (estr.find('.') != std::string::npos) {
-                        float t = atof(estr.c_str());
-                        if (t > 0 && t < 130) id(sc360_outdoor_temp).publish_state(t);
-                      } else {
-                        float h = atof(estr.c_str());
-                        if (h > 0 && h <= 100) id(indoor_humidity).publish_state(h);
-                      }
+                      // SystemOpStatus.E is always indoor humidity (%), always decimal-formatted
+                      float h = atof(j.substr(e_pos, e-e_pos).c_str());
+                      if (h >= 0 && h <= 100)
+                        id(indoor_humidity).publish_state(h);
                     }
                   }
                 }
