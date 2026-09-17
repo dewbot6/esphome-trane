@@ -13,7 +13,7 @@ esphome:
     then:
       - delay: 3s
       - lambda: |-
-          // Restore last known mode immediately so climate entity isn't stuck at OFF
+          // Restore system_mode text sensor display from last known mode
           if (!id(last_mode).empty())
             id(system_mode).publish_state(id(last_mode));
           // Also request current state from SC360
@@ -28,12 +28,6 @@ esphome:
       name: "Trane Air Handler"
     - id: dev_heat_pump
       name: "Trane Heat Pump"
-
-external_components:
-  - source:
-      type: local
-      path: components
-    components: [trane_hvac]
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -904,55 +898,67 @@ text_sensor:
 # Climate entity
 # ---------------------------------------------------------------------------
 climate:
-  - platform: trane_hvac
+  - platform: template
     id: trane_climate
     name: "Trane Climate"
     device_id: dev_thermostat
-    current_temperature_sensor: room_temp
-    heat_setpoint_sensor: heat_setpoint
-    cool_setpoint_sensor: cool_setpoint
-    mode_text_sensor: system_mode
-    demand_stage_sensor: system_demand
-    indoor_unit_state_sensor: indoor_unit_state
+    optimistic: true
+    supports_action: true
+    supports_two_point_target_temperature: true
+    supports_current_temperature: true
+    supported_modes:
+      - "OFF"
+      - HEAT
+      - COOL
+      - HEAT_COOL
+      - FAN_ONLY
+    supported_presets:
+      - NONE
+      - HOME
+      - AWAY
+      - SLEEP
+      - BOOST
+    visual:
+      min_temperature: 15.5   # 60°F
+      max_temperature: 29.4   # 85°F
+      temperature_step: 0.5
 
-    set_mode_action:
-      - script.execute:
-          id: can_transmit_json
-          payload: !lambda |-
+    on_control:
+      - lambda: |-
+          // Mode change
+          if (x.get_mode().has_value()) {
             std::string m;
-            if (mode == climate::CLIMATE_MODE_HEAT)      m = "A";
-            else if (mode == climate::CLIMATE_MODE_COOL) m = "B";
-            else                                          m = "C";
+            climate::ClimateMode new_mode = *x.get_mode();
+            if (new_mode == climate::CLIMATE_MODE_HEAT)      m = "A";
+            else if (new_mode == climate::CLIMATE_MODE_COOL) m = "B";
+            else                                              m = "C";
             char buf[64];
-            snprintf(buf, sizeof(buf),
-              "{\"SystemMode\":{\"Put\":{\"B\":\"%s\"}}}",
-              m.c_str());
-            return std::string(buf);
-
-    set_temperature_action:
-      - script.execute:
-          id: can_transmit_json
-          payload: !lambda |-
+            snprintf(buf, sizeof(buf), "{\"SystemMode\":{\"Put\":{\"B\":\"%s\"}}}", m.c_str());
+            id(can_transmit_json).execute(std::string(buf));
+          }
+          // Setpoint change — both values are already optimistically applied, read current state
+          if (x.get_target_temperature_low().has_value() || x.get_target_temperature_high().has_value()) {
+            float hsp_f = id(trane_climate).target_temperature_low  * 9.0f / 5.0f + 32.0f;
+            float csp_f = id(trane_climate).target_temperature_high * 9.0f / 5.0f + 32.0f;
             char buf[160];
             snprintf(buf, sizeof(buf),
               "{\"SpOverride\":{\"Put\":{\"1\":{\"Hsp\":\"%.0f\",\"Csp\":\"%.0f\","
               "\"HoldType\":\"2\",\"Source\":\"1\"}}}}",
               hsp_f, csp_f);
-            return std::string(buf);
-
-    set_preset_action:
-      - script.execute:
-          id: can_transmit_json
-          payload: !lambda |-
+            id(can_transmit_json).execute(std::string(buf));
+          }
+          // Preset change
+          if (x.get_preset().has_value()) {
             float hsp, csp;
-            if (preset == climate::CLIMATE_PRESET_HOME) {
+            climate::ClimatePreset new_preset = *x.get_preset();
+            if (new_preset == climate::CLIMATE_PRESET_HOME) {
               hsp = id(preset_home_hsp); csp = id(preset_home_csp);
-            } else if (preset == climate::CLIMATE_PRESET_AWAY) {
+            } else if (new_preset == climate::CLIMATE_PRESET_AWAY) {
               hsp = id(preset_away_hsp); csp = id(preset_away_csp);
-            } else if (preset == climate::CLIMATE_PRESET_SLEEP) {
+            } else if (new_preset == climate::CLIMATE_PRESET_SLEEP) {
               hsp = id(preset_sleep_hsp); csp = id(preset_sleep_csp);
-            } else if (preset == climate::CLIMATE_PRESET_BOOST) {
-              hsp = 74; csp = 72;  // Boost: no Trane equivalent, keep hardcoded
+            } else if (new_preset == climate::CLIMATE_PRESET_BOOST) {
+              hsp = 74; csp = 72;
             } else {
               hsp = id(hsp_zone1); csp = id(csp_zone1);
             }
@@ -961,7 +967,8 @@ climate:
               "{\"SpOverride\":{\"Put\":{\"1\":{\"Hsp\":\"%.0f\",\"Csp\":\"%.0f\","
               "\"HoldType\":\"2\",\"Source\":\"1\"}}}}",
               hsp, csp);
-            return std::string(buf);
+            id(can_transmit_json).execute(std::string(buf));
+          }
 
 # ---------------------------------------------------------------------------
 # CAN bus
@@ -1021,10 +1028,9 @@ canbus:
                     // Source (SpOverride only — "2"=thermostat direct, "1"=system default)
                     auto src = j.find("\"Source\":\"", z1s);
                     if (src != std::string::npos && src < z1e_pos) { src += 10; auto e = j.find("\"", src); if (e != std::string::npos) id(setpoint_source).publish_state(j.substr(src, e-src)); }
-                    auto *cl = id(trane_climate);
-                    cl->target_temperature_low  = (id(hsp_zone1) - 32.0f) * 5.0f / 9.0f;
-                    cl->target_temperature_high = (id(csp_zone1) - 32.0f) * 5.0f / 9.0f;
-                    cl->publish_state();
+                    id(trane_climate).target_temperature_low  = (id(hsp_zone1) - 32.0f) * 5.0f / 9.0f;
+                    id(trane_climate).target_temperature_high = (id(csp_zone1) - 32.0f) * 5.0f / 9.0f;
+                    id(trane_climate).publish_state();
                   }
                   // ZoneStatus zone 1 — E (airflow %), F (state), G (demand %)
                   {
@@ -1059,14 +1065,37 @@ canbus:
                                          bval == "C" ? "off" : bval;
                       id(system_mode).publish_state(mode);
                       id(last_mode) = mode;  // persist across reboots
+                      if (mode == "heat")
+                        id(trane_climate).set_mode(climate::CLIMATE_MODE_HEAT);
+                      else if (mode == "cool")
+                        id(trane_climate).set_mode(climate::CLIMATE_MODE_COOL);
+                      else
+                        id(trane_climate).set_mode(climate::CLIMATE_MODE_OFF);
+                      id(trane_climate).publish_state();
                     }
                   }
                   auto c_pos = j.find("\"C\":\"", sos);
                   if (c_pos != std::string::npos) {
                     c_pos += 5;
                     auto e = j.find("\"", c_pos);
-                    if (e != std::string::npos)
-                      id(system_demand).publish_state(j.substr(c_pos, e-c_pos));
+                    if (e != std::string::npos) {
+                      std::string demand = j.substr(c_pos, e-c_pos);
+                      id(system_demand).publish_state(demand);
+                      if (id(trane_climate).mode == climate::CLIMATE_MODE_OFF) {
+                        id(trane_climate).action = climate::CLIMATE_ACTION_OFF;
+                      } else if (demand == "--" || demand.empty()) {
+                        id(trane_climate).action = climate::CLIMATE_ACTION_IDLE;
+                      } else if (demand.find("Cool") != std::string::npos) {
+                        id(trane_climate).action = climate::CLIMATE_ACTION_COOLING;
+                      } else if (demand.find("HP") != std::string::npos || demand.find("ID") != std::string::npos) {
+                        id(trane_climate).action = (id(trane_climate).mode == climate::CLIMATE_MODE_COOL)
+                                                     ? climate::CLIMATE_ACTION_COOLING
+                                                     : climate::CLIMATE_ACTION_HEATING;
+                      } else {
+                        id(trane_climate).action = climate::CLIMATE_ACTION_IDLE;
+                      }
+                      id(trane_climate).publish_state();
+                    }
                   }
                   auto d_pos = j.find("\"D\":\"", sos);
                   if (d_pos != std::string::npos) {
@@ -1111,7 +1140,11 @@ canbus:
                   auto e = j.find("\"", h_pos);
                   if (e != std::string::npos) {
                     float t = atof(j.substr(h_pos, e-h_pos).c_str());
-                    if (t > 32 && t < 110) id(room_temp).publish_state(t);
+                    if (t > 32 && t < 110) {
+                      id(room_temp).publish_state(t);
+                      id(trane_climate).current_temperature = (t - 32.0f) * 5.0f / 9.0f;
+                      id(trane_climate).publish_state();
+                    }
                   }
                 }
                 auto hcs = j.find("\"HcStatus\":\"");
@@ -1228,8 +1261,18 @@ canbus:
                   if (id_pos != std::string::npos) {
                     id_pos += 5;
                     auto e = j.find("\"", id_pos);
-                    if (e != std::string::npos)
-                      id(indoor_unit_state).publish_state(j.substr(id_pos, e-id_pos));
+                    if (e != std::string::npos) {
+                      std::string istate = j.substr(id_pos, e-id_pos);
+                      id(indoor_unit_state).publish_state(istate);
+                      // "B" = blower running; "A" = off/transition
+                      if (istate == "B" && id(trane_climate).action == climate::CLIMATE_ACTION_IDLE) {
+                        id(trane_climate).action = climate::CLIMATE_ACTION_FAN;
+                        id(trane_climate).publish_state();
+                      } else if (istate == "A" && id(trane_climate).action == climate::CLIMATE_ACTION_FAN) {
+                        id(trane_climate).action = climate::CLIMATE_ACTION_IDLE;
+                        id(trane_climate).publish_state();
+                      }
+                    }
                   }
                   // Humidity and ventilation control fields
                   auto hmc = j.find("\"HumControl\":\"", ind);
@@ -1420,6 +1463,9 @@ canbus:
                     if (z1e != std::string::npos) {
                       auto hp = j.find("\"Hsp\":\"", z1p); if (hp != std::string::npos && hp < z1e) { hp += 7; id(hsp_zone1) = atof(j.c_str() + hp); }
                       auto cp2 = j.find("\"Csp\":\"", z1p); if (cp2 != std::string::npos && cp2 < z1e) { cp2 += 7; id(csp_zone1) = atof(j.c_str() + cp2); }
+                      id(trane_climate).target_temperature_low  = (id(hsp_zone1) - 32.0f) * 5.0f / 9.0f;
+                      id(trane_climate).target_temperature_high = (id(csp_zone1) - 32.0f) * 5.0f / 9.0f;
+                      id(trane_climate).publish_state();
                     }
                   }
                 }
