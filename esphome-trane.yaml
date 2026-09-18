@@ -492,6 +492,15 @@ sensor:
     device_id: dev_air_handler
 
   - platform: template
+    name: "Duct Static Pressure"
+    id: duct_static_pressure
+    unit_of_measurement: "inWC"
+    device_class: pressure
+    state_class: measurement
+    accuracy_decimals: 3
+    device_id: dev_air_handler
+
+  - platform: template
     name: "Indoor Blower Speed"
     id: indoor_blower
     unit_of_measurement: "%"
@@ -1496,6 +1505,15 @@ canbus:
               if (t1 > -20 && t1 < 200) id(supply_air_temp).publish_state(t1);
               if (t2 > -20 && t2 < 200) id(supply_air_temp2).publish_state(t2);
 
+      - can_id: 0x310
+        can_id_mask: 0x7FF
+        then:
+          - lambda: |-
+              if (x.size() < 4) return;
+              float p;
+              memcpy(&p, &x[0], 4);
+              if (p >= 0 && p < 5.0f) id(duct_static_pressure).publish_state(p);
+
       - can_id: 0x387
         can_id_mask: 0x7FF
         then:
@@ -1619,7 +1637,7 @@ canbus:
           - lambda: |-
               switch (can_id) {
                 case 0x649: case 0x641:
-                case 0x283: case 0x308: case 0x387: case 0x383:
+                case 0x283: case 0x308: case 0x310: case 0x387: case 0x383:
                 case 0x381: case 0x38F: case 0x410: case 0x430:
                 case 0x450: case 0x490: case 0x386: case 0x380:
                 case 0x5C9: case 0x5C1:
