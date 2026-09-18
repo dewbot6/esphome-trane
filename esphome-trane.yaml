@@ -456,7 +456,7 @@ sensor:
 
   # --- Air Handler ----------------------------------------------------------
   - platform: template
-    name: "AHU Inlet Air Temp"
+    name: "Indoor Liquid Line Temp"
     id: indoor_temp
     unit_of_measurement: "°F"
     device_class: temperature
@@ -465,7 +465,7 @@ sensor:
     device_id: dev_air_handler
 
   - platform: template
-    name: "Indoor Coil Temp"
+    name: "Indoor Coil Refrigerant Temp"
     id: indoor_temp2
     unit_of_measurement: "°F"
     device_class: temperature
