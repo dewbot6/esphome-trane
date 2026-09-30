@@ -1,0 +1,15 @@
+# Python venv (pyOCD) — recreate with: python3 -m venv .venv && .venv/bin/pip install pyocd
+.venv/
+
+# Transient Ghidra headless project (recreated on each analyzeHeadless run)
+ghidra/proj/
+
+# Downloaded third-party artifact (Raspberry Pi debugprobe release)
+probe-firmware/*.uf2
+
+# Firmware dumps + raw CAN captures — kept locally, not uploaded (large binaries).
+# The findings derived from them live in CANOPEN_MAP.md and ghidra/.
+dumps/
+
+# macOS
+.DS_Store

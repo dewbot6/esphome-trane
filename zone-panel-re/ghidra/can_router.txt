@@ -1,0 +1,145 @@
+=== CAN-related functions (5) ===
+  080025c8  FUN_080025c8
+  0800264c  FUN_0800264c
+  0800b0e0  FUN_0800b0e0
+  0800b164  FUN_0800b164
+  0800d5f0  FUN_0800d5f0
+
+//======================================================
+// FUN_080025c8 @ 080025c8
+//======================================================
+
+void FUN_080025c8(void)
+
+{
+  uint uVar1;
+  byte bVar2;
+  
+  uVar1 = *(uint *)(DAT_08002640 + 0xc);
+  if ((*(uint *)(DAT_08002640 + 0xc) & 0x10) != 0) {
+    *(uint *)(DAT_08002640 + 0xc) = *(uint *)(DAT_08002640 + 0xc) | 0x10;
+  }
+  if ((uVar1 & 3) != 0) {
+    for (bVar2 = 0; bVar2 < ((byte)uVar1 & 3); bVar2 = bVar2 + 1) {
+      if ((*(uint *)(DAT_08002640 + 0x1b0) & 6) == 0) {
+        (*(code *)*DAT_08002644)
+                  (*(uint *)(DAT_08002640 + 0x1b0) >> 0x15,*(uint *)(DAT_08002640 + 0x1b4) & 0xf,
+                   DAT_08002648);
+      }
+      *(uint *)(DAT_08002640 + 0xc) = *(uint *)(DAT_08002640 + 0xc) | 0x20;
+    }
+  }
+  return;
+}
+
+
+
+//======================================================
+// FUN_0800264c @ 0800264c
+//======================================================
+
+void FUN_0800264c(void)
+
+{
+  uint uVar1;
+  byte bVar2;
+  
+  uVar1 = *(uint *)(DAT_080026c4 + 0x10);
+  if ((*(uint *)(DAT_080026c4 + 0x10) & 0x10) != 0) {
+    *(uint *)(DAT_080026c4 + 0x10) = *(uint *)(DAT_080026c4 + 0x10) | 0x10;
+  }
+  if ((uVar1 & 3) != 0) {
+    for (bVar2 = 0; bVar2 < ((byte)uVar1 & 3); bVar2 = bVar2 + 1) {
+      if ((*(uint *)(DAT_080026c4 + 0x1c0) & 6) == 0) {
+        (*(code *)*DAT_080026c8)
+                  (*(uint *)(DAT_080026c4 + 0x1c0) >> 0x15,*(uint *)(DAT_080026c4 + 0x1c4) & 0xf,
+                   DAT_080026cc);
+      }
+      *(uint *)(DAT_080026c4 + 0x10) = *(uint *)(DAT_080026c4 + 0x10) | 0x20;
+    }
+  }
+  return;
+}
+
+
+
+//======================================================
+// FUN_0800b0e0 @ 0800b0e0
+//======================================================
+
+void FUN_0800b0e0(void)
+
+{
+  uint uVar1;
+  byte bVar2;
+  
+  uVar1 = *(uint *)(DAT_0800b15c + 0xc);
+  if ((*(uint *)(DAT_0800b15c + 0xc) & 0x10) != 0) {
+    *(uint *)(DAT_0800b15c + 0xc) = *(uint *)(DAT_0800b15c + 0xc) | 0x10;
+  }
+  if ((uVar1 & 3) != 0) {
+    for (bVar2 = 0; bVar2 < ((byte)uVar1 & 3); bVar2 = bVar2 + 1) {
+      if (((*(uint *)(DAT_0800b15c + 0x1b0) & 6) == 0) && ((code *)*DAT_0800b160 != (code *)0x0)) {
+        (*(code *)*DAT_0800b160)
+                  (*(uint *)(DAT_0800b15c + 0x1b0) >> 0x15,*(uint *)(DAT_0800b15c + 0x1b4) & 0xf,
+                   DAT_0800b15c + 0x1b8);
+      }
+      *(uint *)(DAT_0800b15c + 0xc) = *(uint *)(DAT_0800b15c + 0xc) | 0x20;
+    }
+  }
+  return;
+}
+
+
+
+//======================================================
+// FUN_0800b164 @ 0800b164
+//======================================================
+
+void FUN_0800b164(void)
+
+{
+  uint uVar1;
+  byte bVar2;
+  
+  uVar1 = *(uint *)(DAT_0800b1e0 + 0x10);
+  if ((*(uint *)(DAT_0800b1e0 + 0x10) & 0x10) != 0) {
+    *(uint *)(DAT_0800b1e0 + 0x10) = *(uint *)(DAT_0800b1e0 + 0x10) | 0x10;
+  }
+  if ((uVar1 & 3) != 0) {
+    for (bVar2 = 0; bVar2 < ((byte)uVar1 & 3); bVar2 = bVar2 + 1) {
+      if (((*(uint *)(DAT_0800b1e0 + 0x1c0) & 6) == 0) && ((code *)*DAT_0800b1e4 != (code *)0x0)) {
+        (*(code *)*DAT_0800b1e4)
+                  (*(uint *)(DAT_0800b1e0 + 0x1c0) >> 0x15,*(uint *)(DAT_0800b1e0 + 0x1c4) & 0xf,
+                   DAT_0800b1e0 + 0x1c8);
+      }
+      *(uint *)(DAT_0800b1e0 + 0x10) = *(uint *)(DAT_0800b1e0 + 0x10) | 0x20;
+    }
+  }
+  return;
+}
+
+
+
+//======================================================
+// FUN_0800d5f0 @ 0800d5f0
+//======================================================
+
+void FUN_0800d5f0(uint param_1)
+
+{
+  uint uVar1;
+  
+  if (param_1 <= DAT_0800d62c) {
+    uVar1 = (uint)((ulonglong)DAT_0800d630 * (ulonglong)param_1 >> 0x35);
+    *DAT_0800d634 = uVar1;
+    param_1 = param_1 - DAT_0800d638 * uVar1;
+    uVar1 = (uint)((ulonglong)DAT_0800d63c * (ulonglong)param_1 >> 0x2e);
+    *DAT_0800d640 = uVar1;
+    *DAT_0800d648 = (uint)((ulonglong)DAT_0800d644 * (ulonglong)(param_1 + uVar1 * -60000) >> 0x26);
+  }
+  return;
+}
+
+
+

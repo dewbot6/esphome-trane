@@ -1,0 +1,11 @@
+# Loaded automatically by any pyocd command run from this directory.
+target_override: cortex_m
+frequency: 500000
+# Panel firmware disables SWD ~ms after boot, so connect while holding the chip in
+# hardware reset (RST wired to Pico GP1). Firmware never runs; SWD stays enabled.
+connect_mode: under-reset
+reset_type: hw
+# Unlocking a read-protected part mass-erases flash; the panel firmware is not recoverable.
+auto_unlock: false
+# Leave the core halted on disconnect so nothing runs off mid-dump.
+resume_on_disconnect: false

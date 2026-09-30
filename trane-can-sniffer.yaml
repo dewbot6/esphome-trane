@@ -1,0 +1,61 @@
+# Minimal CAN sniffer for bench-testing the Trane Link zone panel.
+# Logs EVERY frame (no skip list) in candump style: (sec.ms) can0 <ID>#<DATA>
+# so captures can be fed straight into python-can / cantools for CANopen decode.
+#
+# Same device name / board / pins as esphome-trane, so you OTA this on, capture,
+# then OTA esphome-trane.yaml back to the same address.
+#
+# BENCH NOTE: the ESP stays in NORMAL mode (esp32_can default), so it ACKs the
+# panel's frames. On a 2-node bench bus (panel + ESP only) that ACK is required
+# or the panel never sees an ack, retransmits forever, and goes bus-off. This
+# sniffer only reads frames; it never transmits application traffic.
+
+esphome:
+  name: esphome-trane
+  friendly_name: Trane CAN Sniffer
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+
+logger:
+  level: INFO          # keep the log clean; the sniffer prints at INFO
+  baud_rate: 115200    # also available over USB serial if WiFi is out of range
+
+api:                   # lets `esphome logs` stream the capture over WiFi
+
+ota:
+  - platform: esphome
+
+wifi:
+  networks:
+    - ssid: !secret wifi_ssid
+      password: !secret wifi_password
+      hidden: true
+  ap:
+    ssid: "Trane CAN Sniffer"
+
+captive_portal:
+
+canbus:
+  - platform: esp32_can
+    id: hvac_can
+    tx_pin: GPIO5
+    rx_pin: GPIO6
+    bit_rate: 50kbps
+    can_id: 0x7FF        # our own (unused) TX id, harmless; we only listen
+    on_frame:
+      - can_id: 0x000
+        can_id_mask: 0x000    # match every standard ID
+        then:
+          - lambda: |-
+              char hex[20];
+              int p = 0;
+              for (int i = 0; i < (int)x.size() && p < 18; i++)
+                p += snprintf(hex + p, sizeof(hex) - p, "%02X", x[i]);
+              hex[p] = 0;
+              uint32_t ms = millis();
+              ESP_LOGI("cansniff", "(%u.%03u) can0 %03X#%s",
+                       (unsigned)(ms / 1000), (unsigned)(ms % 1000),
+                       (unsigned)can_id, hex);
