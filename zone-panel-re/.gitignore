@@ -11,5 +11,8 @@ probe-firmware/*.uf2
 # The findings derived from them live in CANOPEN_MAP.md and ghidra/.
 dumps/
 
+# Trane's copyrighted installation manual — local reference only, not redistributed.
+reference/
+
 # macOS
 .DS_Store
