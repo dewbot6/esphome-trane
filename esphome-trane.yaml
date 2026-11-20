@@ -22,16 +22,22 @@ esphome:
   devices:
     - id: dev_thermostat
       name: "Trane Thermostat UX360"
+      relation: via
     - id: dev_sc360
       name: "Trane SC360 Controller"
+      relation: via
     - id: dev_air_handler
       name: "Trane Air Handler"
+      relation: via
     - id: dev_heat_pump
       name: "Trane Heat Pump"
+      relation: via
     - id: dev_remote_sensor_1
       name: "Remote Temp Sensor 1"
+      relation: via
     - id: dev_remote_sensor_2
       name: "Remote Temp Sensor 2"
+      relation: via
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -51,8 +57,8 @@ logger:
     can5c1: DEBUG
 
 api:
-  services:
-    - service: set_temperature
+  actions:
+    - action: set_temperature
       variables:
         target_temp_low: float
         target_temp_high: float
@@ -66,7 +72,7 @@ api:
                 target_temp_low, target_temp_high);
               return std::string(buf);
 
-    - service: set_mode
+    - action: set_mode
       variables:
         mode: string
       then:
@@ -82,8 +88,11 @@ api:
                 m.c_str());
               return std::string(buf);
 
+  encryption:
+    key: !secret esphome_trane__encryption_key
 ota:
   - platform: esphome
+    encryption:
 
 web_server:
   port: 80
