@@ -118,6 +118,39 @@ globals:
     type: std::string
     restore_value: no
     initial_value: ""
+  # SDO block-transfer reassembly state (0x649 / 0x641)
+  - id: sz_649
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: seq_649
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: ok_649
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: sz_641
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: seq_641
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: ok_641
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: sc360_rx_count
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: sc360_drop_count
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
   - id: hsp_zone1
     type: float
     restore_value: yes
@@ -708,6 +741,23 @@ sensor:
     accuracy_decimals: 0
     device_id: dev_thermostat
 
+  # --- SC360 bus diagnostics ------------------------------------------------
+  - platform: template
+    name: "SC360 Messages Received"
+    id: sc360_rx_sensor
+    state_class: total_increasing
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    device_id: dev_sc360
+
+  - platform: template
+    name: "SC360 Messages Dropped"
+    id: sc360_drop_sensor
+    state_class: total_increasing
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    device_id: dev_sc360
+
 # ---------------------------------------------------------------------------
 # Binary sensors
 # ---------------------------------------------------------------------------
@@ -1029,6 +1079,9 @@ canbus:
     rx_pin: GPIO6
     bit_rate: 50kbps
     can_id: 1
+    # The TWAI default is 5 frames; SC360 JSON arrives in bursts every ~2.5 ms, so any
+    # main-loop stall over ~12 ms (BLE proxy, Wi-Fi, JSON parsing) overflowed it.
+    rx_queue_len: 64
 
     on_frame:
 
@@ -1039,18 +1092,51 @@ canbus:
         can_id_mask: 0x7FF
         then:
           - lambda: |-
-              uint8_t seq = x[0];
-              if ((seq & 0xF0) == 0xC0) {
-                id(buf_649) = "";
-                for (int i = 5; i < (int)x.size(); i++)
-                  if (x[i] && id(buf_649).size() < 512) id(buf_649) += (char)x[i];
-              } else if (seq & 0x80) {
-                int used = (seq & 0x7F) - 1;
-                for (int i = 1; i <= used && i < (int)x.size(); i++) {
-                  if (x[i] == 0) break;
-                  if (id(buf_649).size() < 512) id(buf_649) += (char)x[i];
-                }
-                std::string j = id(buf_649);
+              // CANopen SDO block download (CiA 301): an initiate frame (0xC0|s<<1, index,
+              // sub, size in bytes 4-7), then segments whose byte 0 is the seqno (1..127,
+              // restarting at 1 each block) with bit 7 set on the last one. The JSON is
+              // NUL-terminated and the declared size counts the NUL.
+              if (x.empty()) return;
+              uint8_t b0 = x[0];
+              if ((b0 & 0xF9) == 0xC0) {
+                id(buf_649).clear();
+                id(sz_649) = ((b0 & 0x02) && x.size() >= 8)
+                    ? (uint32_t) x[4] | ((uint32_t) x[5] << 8) | ((uint32_t) x[6] << 16) | ((uint32_t) x[7] << 24)
+                    : 0;
+                id(seq_649) = 1;
+                id(ok_649) = true;
+                return;
+              }
+              if ((b0 & 0xE3) == 0xC1 || b0 == 0x80) return;  // end-block / abort
+              if (!id(ok_649)) return;
+              int sn = b0 & 0x7F;
+              if (sn == 1 && id(seq_649) > 1) id(seq_649) = 1;  // next block
+              if (sn != id(seq_649)) {
+                id(ok_649) = false;
+                id(sc360_drop_count) += 1;
+                ESP_LOGW("can649", "dropped message: expected segment %d, got %d", id(seq_649), sn);
+                return;
+              }
+              id(seq_649) += 1;
+              for (size_t i = 1; i < x.size(); i++) id(buf_649) += (char) x[i];
+              if (id(buf_649).size() > 4096) {
+                id(ok_649) = false;
+                id(sc360_drop_count) += 1;
+                return;
+              }
+              if (!(b0 & 0x80)) return;
+              id(ok_649) = false;
+              std::string raw = id(buf_649);
+              id(buf_649).clear();
+              std::string j = raw.substr(0, raw.find('\0'));
+              uint32_t sz = id(sz_649);
+              if (sz != 0 && j.size() + 1 != sz && j.size() != sz) {
+                id(sc360_drop_count) += 1;
+                ESP_LOGW("can649", "dropped message: declared %u bytes, got %u", (unsigned) sz, (unsigned) j.size());
+                return;
+              }
+              id(sc360_rx_count) += 1;
+              {
                 id(last_json_649).publish_state(j);
                 ESP_LOGD("can649", "JSON: %s", j.c_str());
                 // Hsp/Csp zone 1 — anchored to SpOverride or ZoneStatus."1" only
@@ -1473,10 +1559,6 @@ canbus:
                   auto we = j.find("\"WeeklySchEnable\":\"", sch);
                   if (we != std::string::npos) { we += 19; auto e = j.find("\"", we); if (e != std::string::npos) id(schedule_enabled).publish_state(j.substr(we, e-we)); }
                 }
-                id(buf_649) = "";
-              } else {
-                for (int i = 1; i < (int)x.size(); i++)
-                  if (x[i] && id(buf_649).size() < 512) id(buf_649) += (char)x[i];
               }
 
       # -----------------------------------------------------------------------
@@ -1486,18 +1568,51 @@ canbus:
         can_id_mask: 0x7FF
         then:
           - lambda: |-
-              uint8_t seq = x[0];
-              if ((seq & 0xF0) == 0xC0) {
-                id(buf_641) = "";
-                for (int i = 5; i < (int)x.size(); i++)
-                  if (x[i] && id(buf_641).size() < 512) id(buf_641) += (char)x[i];
-              } else if (seq & 0x80) {
-                int used = (seq & 0x7F) - 1;
-                for (int i = 1; i <= used && i < (int)x.size(); i++) {
-                  if (x[i] == 0) break;
-                  if (id(buf_641).size() < 512) id(buf_641) += (char)x[i];
-                }
-                std::string j = id(buf_641);
+              // CANopen SDO block download (CiA 301): an initiate frame (0xC0|s<<1, index,
+              // sub, size in bytes 4-7), then segments whose byte 0 is the seqno (1..127,
+              // restarting at 1 each block) with bit 7 set on the last one. The JSON is
+              // NUL-terminated and the declared size counts the NUL.
+              if (x.empty()) return;
+              uint8_t b0 = x[0];
+              if ((b0 & 0xF9) == 0xC0) {
+                id(buf_641).clear();
+                id(sz_641) = ((b0 & 0x02) && x.size() >= 8)
+                    ? (uint32_t) x[4] | ((uint32_t) x[5] << 8) | ((uint32_t) x[6] << 16) | ((uint32_t) x[7] << 24)
+                    : 0;
+                id(seq_641) = 1;
+                id(ok_641) = true;
+                return;
+              }
+              if ((b0 & 0xE3) == 0xC1 || b0 == 0x80) return;  // end-block / abort
+              if (!id(ok_641)) return;
+              int sn = b0 & 0x7F;
+              if (sn == 1 && id(seq_641) > 1) id(seq_641) = 1;  // next block
+              if (sn != id(seq_641)) {
+                id(ok_641) = false;
+                id(sc360_drop_count) += 1;
+                ESP_LOGW("can641", "dropped message: expected segment %d, got %d", id(seq_641), sn);
+                return;
+              }
+              id(seq_641) += 1;
+              for (size_t i = 1; i < x.size(); i++) id(buf_641) += (char) x[i];
+              if (id(buf_641).size() > 4096) {
+                id(ok_641) = false;
+                id(sc360_drop_count) += 1;
+                return;
+              }
+              if (!(b0 & 0x80)) return;
+              id(ok_641) = false;
+              std::string raw = id(buf_641);
+              id(buf_641).clear();
+              std::string j = raw.substr(0, raw.find('\0'));
+              uint32_t sz = id(sz_641);
+              if (sz != 0 && j.size() + 1 != sz && j.size() != sz) {
+                id(sc360_drop_count) += 1;
+                ESP_LOGW("can641", "dropped message: declared %u bytes, got %u", (unsigned) sz, (unsigned) j.size());
+                return;
+              }
+              id(sc360_rx_count) += 1;
+              {
                 id(last_json_641).publish_state(j);
                 ESP_LOGD("can641", "JSON: %s", j.c_str());
                 // Hsp/Csp zone 1 — anchored to SpOverride."1" only
@@ -1526,10 +1641,6 @@ canbus:
                   auto bi = j.find("\"BuildInfo\":\"", uid);
                   if (bi != std::string::npos) { bi += 13; auto e = j.find("\"", bi); if (e != std::string::npos) id(unit_firmware).publish_state(j.substr(bi, e-bi)); }
                 }
-                id(buf_641) = "";
-              } else {
-                for (int i = 1; i < (int)x.size(); i++)
-                  if (x[i] && id(buf_641).size() < 512) id(buf_641) += (char)x[i];
               }
 
       # -----------------------------------------------------------------------
@@ -1718,3 +1829,13 @@ canbus:
 esp32_ble_tracker:
 
 bluetooth_proxy:
+
+# ---------------------------------------------------------------------------
+# Periodic diagnostics
+# ---------------------------------------------------------------------------
+interval:
+  - interval: 60s
+    then:
+      - lambda: |-
+          id(sc360_rx_sensor).publish_state(id(sc360_rx_count));
+          id(sc360_drop_sensor).publish_state(id(sc360_drop_count));
