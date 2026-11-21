@@ -709,6 +709,20 @@ sensor:
     device_id: dev_thermostat
 
 # ---------------------------------------------------------------------------
+# Binary sensors
+# ---------------------------------------------------------------------------
+binary_sensor:
+
+  # --- Heat Pump ------------------------------------------------------------
+  # Set from ZoneStatus.HcStatus on 0x649: 7 = defrost (3 = heating, 4 = idle).
+  # During defrost the heat pump runs reversed and the furnace fires to temper.
+  - platform: template
+    name: "Defrost Active"
+    id: defrost_active
+    icon: "mdi:snowflake-melt"
+    device_id: dev_heat_pump
+
+# ---------------------------------------------------------------------------
 # Text sensors
 # ---------------------------------------------------------------------------
 text_sensor:
@@ -1180,8 +1194,11 @@ canbus:
                 if (hcs != std::string::npos) {
                   hcs += 12;
                   auto e = j.find("\"", hcs);
-                  if (e != std::string::npos)
-                    id(hc_status).publish_state(j.substr(hcs, e-hcs));
+                  if (e != std::string::npos) {
+                    std::string hc = j.substr(hcs, e-hcs);
+                    id(hc_status).publish_state(hc);
+                    id(defrost_active).publish_state(hc == "7");
+                  }
                 }
                 // OdStatus
                 auto cdp = j.find("\"CompDemandPercent\":\"");
