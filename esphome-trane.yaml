@@ -1216,7 +1216,8 @@ canbus:
                     auto e = j.find("\"", b2);
                     if (e != std::string::npos) {
                       float hz = atof(j.substr(b2, e-b2).c_str());
-                      if (hz > 0) id(compressor_freq).publish_state(hz);
+                      // B = "0" when the compressor stops; publish it so the reading doesn't stick
+                      if (hz >= 0) id(compressor_freq).publish_state(hz);
                     }
                   }
                   // D = fault code
