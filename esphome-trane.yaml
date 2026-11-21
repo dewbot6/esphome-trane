@@ -814,6 +814,14 @@ text_sensor:
     id: hc_status
     device_id: dev_thermostat
 
+  # Plain-language view of HcStatus. The house is dual-fuel: heat pump plus a
+  # 2-stage gas furnace; during defrost the furnace fires to temper the air.
+  - platform: template
+    name: "Heat Source"
+    id: heat_source
+    icon: "mdi:fire-circle"
+    device_id: dev_thermostat
+
   - platform: template
     name: "Hold Text"
     id: hold_text
@@ -1284,6 +1292,15 @@ canbus:
                     std::string hc = j.substr(hcs, e-hcs);
                     id(hc_status).publish_state(hc);
                     id(defrost_active).publish_state(hc == "7");
+                    const char *src =
+                        hc == "2" ? "Cooling" :
+                        hc == "3" ? "Heat Pump" :
+                        hc == "4" ? "Idle" :
+                        hc == "5" ? "Gas Furnace" :
+                        hc == "7" ? "Defrost (Heat Pump + Furnace)" : nullptr;
+                    std::string hs = src ? std::string(src) : "Unknown (" + hc + ")";
+                    if (!id(heat_source).has_state() || id(heat_source).state != hs)
+                      id(heat_source).publish_state(hs);
                   }
                 }
                 // OdStatus
